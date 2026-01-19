@@ -6,25 +6,7 @@ import { ArrowRight, BarChart3, Building2, Calculator } from "lucide-react";
 export default function Home() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-xl text-primary">
-            <Building2 className="h-6 w-6" />
-            <span>DIN 18599 에너지 해석</span>
-          </div>
-          <nav className="flex gap-4">
-            <Button variant="ghost" asChild>
-              <Link href="/projects">프로젝트</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link href="/docs">도움말</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/login">로그인</Link>
-            </Button>
-          </nav>
-        </div>
-      </header>
+
 
       <main className="flex-1">
         <section className="py-24 px-4 text-center space-y-8 bg-gradient-to-b from-background to-muted/20">

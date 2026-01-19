@@ -8,6 +8,8 @@ import { getSurfaces } from "@/services/surface-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { Zone } from "@/types/project";
+import { MonthlyDemandChart } from "./monthly-demand-chart";
+import { EnergyBalanceChart } from "./energy-balance-chart";
 
 interface ResultsViewProps {
     projectId: string;
@@ -99,10 +101,16 @@ export function ResultsView({ projectId }: ResultsViewProps) {
                 </Card>
             </div>
 
-            {/* 월별 차트 (테이블로 대체 for now) */}
+            {/* 차트 영역 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <MonthlyDemandChart data={results.monthly} />
+                <EnergyBalanceChart data={results.monthly} />
+            </div>
+
+            {/* 월별 데이터 테이블 */}
             <Card>
                 <CardHeader>
-                    <CardTitle>월별 에너지 상세</CardTitle>
+                    <CardTitle>월별 데이터 상세</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">

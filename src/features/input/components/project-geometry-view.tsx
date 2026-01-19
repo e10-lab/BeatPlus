@@ -4,9 +4,16 @@ import { useState } from "react";
 import { Zone } from "@/types/project";
 import { ZoneList } from "./zone-list";
 import { ZoneForm } from "./zone-form";
+import { SurfaceList } from "./surface-list";
+import { SurfaceForm } from "./surface-form";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowLeft } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Construction } from "@/types/project";
+import { ConstructionManager } from "./construction-manager";
+import { getConstructions } from "@/services/construction-service";
+import { useEffect } from "react";
 
 interface ProjectGeometryViewProps {
     projectId: string;
@@ -14,6 +21,23 @@ interface ProjectGeometryViewProps {
 
 export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
     const [viewMode, setViewMode] = useState<"list" | "form" | "zone-detail" | "surface-form">("list");
+    const [selectedTab, setSelectedTab] = useState("zones");
+    const [constructions, setConstructions] = useState<Construction[]>([]);
+
+    // Load Constructions on Mount
+    useEffect(() => {
+        loadConstructions();
+    }, [projectId]);
+
+    const loadConstructions = async () => {
+        try {
+            const data = await getConstructions(projectId);
+            setConstructions(data);
+        } catch (error) {
+            console.error("Failed to load constructions:", error);
+        }
+    };
+
     const [selectedZone, setSelectedZone] = useState<Zone | undefined>(undefined);
     const [selectedSurface, setSelectedSurface] = useState<any | undefined>(undefined); // Type should include Surface
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -62,6 +86,55 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
         setViewMode("zone-detail");
     };
 
+    // Construction Handlers
+    const handleConstructionUpdate = async (updatedList: Construction[]) => {
+        // This prop is generic update from manager, but manager usually handles save internally?
+        // Actually ConstructionManager props are: constructions, projectId, onUpdate.
+        // But ConstructionManager implementation handles SAVE internally via onSave callback loop?
+        // Let's check ConstructionManager again.
+        // It calls onUpdate with NEW LIST. It doesn't call service.
+        // So we need to intercept the Save in ConstructionManager or pass a handler that does the service call.
+        // Wait, ConstructionManager prop `onUpdate` expects the FULL list.
+        // If I change ConstructionManager to handle persistence, I should change its props.
+        // OR I keep ConstructionManager as UI-only and handle persistence here.
+        // But ConstructionManager has the "Save" button logic inside `handleSave`.
+        // Let's look at ConstructionManager line 20: `onUpdate(constructions.map...)` or `onUpdate([...])`.
+        // It expects `onUpdate` to update the local state.
+        // I should modify `ConstructionManager` to accept async `onSave` / `onDelete` instead of full list update? 
+        // OR simply watch the list? No, that's bad for DB sync.
+
+        // Better approach: Modify ConstructionManager to take `onSave` and `onDelete` props that return Promise.
+        // But for now, since I can't easily change ConstructionManager's internal logic without viewing it again (I viewed it),
+        // I will implement a wrapper or just use the updated list? 
+        // No, using updated list means I have to diff to find what changed. That's inefficient.
+
+        // Let's UPDATE ConstructionManager first to support direct Service calls? 
+        // OR, just implement `onUpdate` here to do the DB calls.
+        // But `onUpdate` provides the Whole List.
+        // I'll stick to updating `ProjectGeometryView` to pass specific handlers if possible, 
+        // but since `ConstructionManager` uses `onUpdate` with full list, I should probably REFACTOR ConstructionManager 
+        // to be "Connected" or accept add/update/delete callbacks.
+
+        // Let's Refactor ConstructionManager first.
+        // But I am in the middle of replacing ProjectGeometryView.
+        // I will inject the correct logic here assuming I WILL refactor ConstructionManager next.
+        // Wait, I can't do that. 
+
+        // Let's just load the constructions here. And pass them down.
+        // And I will simply pass `setConstructions` to `onUpdate` for now to keep it working locally?
+        // No, user wants persistence.
+
+        // I will change `onUpdate` in `ProjectGeometryView` (this file) to NOT be used, 
+        // and instead I'll pass a wrapped `ConstructionManager` that handles persistence?
+        // No, I'll modify `ConstructionManager` in the NEXT step.
+        // For THIS step, I will just set up the loading and leave the `onUpdate` as state update (transient) 
+        // and THEN fix the persistence in Manager.
+        // actually, `getConstructions` is async. 
+
+        // Let's implement `loadConstructions` and pass `constructions` to `SurfaceForm`.
+        setConstructions(updatedList);
+    };
+
     // Sub-Views
     if (viewMode === "form") {
         return (
@@ -85,9 +158,6 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
     }
 
     if (viewMode === "zone-detail" && selectedZone) {
-        // Dynamic import to avoid circular dependency if define in same file, or just import at top
-        const { SurfaceList } = require("./surface-list");
-
         return (
             <div className="space-y-6">
                 <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className="-ml-2 mb-2">
@@ -122,6 +192,7 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                             zoneId={selectedZone.id!}
                             onEdit={handleEditSurface}
                             refreshTrigger={refreshTrigger}
+                            constructions={constructions}
                         />
                     </CardContent>
                 </Card>
@@ -130,8 +201,6 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
     }
 
     if (viewMode === "surface-form" && selectedZone) {
-        const { SurfaceForm } = require("./surface-form");
-
         return (
             <div className="space-y-4 max-w-3xl mx-auto">
                 <Button variant="ghost" size="sm" onClick={() => setViewMode("zone-detail")} className="mb-2">
@@ -150,6 +219,7 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                         surface={selectedSurface}
                         onSuccess={handleSurfaceFormSuccess}
                         onCancel={handleSurfaceFormCancel}
+                        constructions={constructions}
                     />
                 </div>
             </div>
@@ -157,25 +227,53 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
     }
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-                <div className="space-y-1.5">
-                    <CardTitle>건물 형상 (Geometry)</CardTitle>
-                    <CardDescription>
-                        건물의 존(Zone)과 외피(Surface) 정보를 관리합니다.
-                    </CardDescription>
-                </div>
-                <Button onClick={handleAddZone}>
-                    <Plus className="mr-2 h-4 w-4" /> 존 추가
-                </Button>
-            </CardHeader>
-            <CardContent>
-                <ZoneList
-                    projectId={projectId}
-                    onEdit={handleOpenZone}
-                    refreshTrigger={refreshTrigger}
-                />
-            </CardContent>
-        </Card>
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
+            <TabsList>
+                <TabsTrigger value="zones">존 관리 (Zones)</TabsTrigger>
+                <TabsTrigger value="constructions">외피 유형 (Constructions)</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="zones">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+                        <div className="space-y-1.5">
+                            <CardTitle>건물 형상 (Geometry)</CardTitle>
+                            <CardDescription>
+                                건물의 존(Zone)과 외피(Surface) 정보를 관리합니다.
+                            </CardDescription>
+                        </div>
+                        <Button onClick={handleAddZone}>
+                            <Plus className="mr-2 h-4 w-4" /> 존 추가
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        <ZoneList
+                            projectId={projectId}
+                            onEdit={handleEditZone}
+                            onViewDetail={handleOpenZone}
+                            refreshTrigger={refreshTrigger}
+                        />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            <TabsContent value="constructions">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>외피 유형 관리 (Construction Manager)</CardTitle>
+                        <CardDescription>
+                            벽, 창, 지붕 등의 구조체(Construction)를 정의하고 열관류율(U-value)을 관리합니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ConstructionManager
+                            constructions={constructions}
+                            projectId={projectId}
+                            onUpdate={loadConstructions}
+                        />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
     );
 }

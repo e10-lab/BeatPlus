@@ -8,14 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Edit2, Trash2, Layers, Compass, Scaling } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+import { Construction } from "@/types/project";
+
 interface SurfaceListProps {
     projectId: string;
     zoneId: string;
     onEdit: (surface: Surface) => void;
     refreshTrigger: number;
+    constructions?: Construction[];
 }
 
-export function SurfaceList({ projectId, zoneId, onEdit, refreshTrigger }: SurfaceListProps) {
+export function SurfaceList({ projectId, zoneId, onEdit, refreshTrigger, constructions = [] }: SurfaceListProps) {
     const [surfaces, setSurfaces] = useState<Surface[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -83,6 +86,12 @@ export function SurfaceList({ projectId, zoneId, onEdit, refreshTrigger }: Surfa
                                 <div className="flex items-center gap-1">
                                     <span>U: {surface.uValue}</span>
                                 </div>
+                                {surface.constructionId && constructions.length > 0 && (
+                                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted rounded text-[10px]">
+                                        <Layers className="h-3 w-3" />
+                                        {constructions.find(c => c.id === surface.constructionId)?.name || "Unknown"}
+                                    </div>
+                                )}
                                 {surface.orientation && (
                                     <div className="flex items-center gap-1">
                                         <Compass className="h-3 w-3" />

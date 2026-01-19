@@ -5,15 +5,17 @@ import { Zone } from "@/types/project";
 import { getZones, deleteZone } from "@/services/zone-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit2, Trash2, Box, Thermometer, Ruler } from "lucide-react";
+import { Edit2, Trash2, Box, Thermometer, Ruler, MoveVertical, Cuboid } from "lucide-react";
+import { DIN_18599_PROFILES } from "@/lib/din-18599-profiles";
 
 interface ZoneListProps {
     projectId: string;
     onEdit: (zone: Zone) => void;
+    onViewDetail: (zone: Zone) => void;
     refreshTrigger: number; // Simple way to trigger refresh from parent
 }
 
-export function ZoneList({ projectId, onEdit, refreshTrigger }: ZoneListProps) {
+export function ZoneList({ projectId, onEdit, onViewDetail, refreshTrigger }: ZoneListProps) {
     const [zones, setZones] = useState<Zone[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -45,6 +47,10 @@ export function ZoneList({ projectId, onEdit, refreshTrigger }: ZoneListProps) {
         }
     };
 
+    const getUsageName = (id: string) => {
+        return DIN_18599_PROFILES[id]?.name || id;
+    };
+
     if (loading) {
         return <div className="text-center py-8 text-muted-foreground">존 목록 로딩 중...</div>;
     }
@@ -60,18 +66,18 @@ export function ZoneList({ projectId, onEdit, refreshTrigger }: ZoneListProps) {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {zones.map((zone) => (
                 <Card
                     key={zone.id}
                     className="relative group cursor-pointer hover:border-primary transition-all"
-                    onClick={() => onEdit(zone)} // This now opens detail view
+                    onClick={() => onViewDetail(zone)}
                 >
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                             <CardTitle className="text-lg font-bold flex items-center gap-2">
                                 <Box className="h-4 w-4 text-primary" />
-                                {zone.name}
+                                <span className="truncate">{zone.name}</span>
                             </CardTitle>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button
@@ -101,20 +107,22 @@ export function ZoneList({ projectId, onEdit, refreshTrigger }: ZoneListProps) {
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
                         <div className="flex justify-between border-b pb-1">
-                            <span className="text-muted-foreground">용도</span>
-                            <span className="font-medium capitalize">{zone.usageType}</span>
+                            <span className="text-muted-foreground text-xs">용도</span>
+                            <span className="font-medium text-xs truncate max-w-[150px]" title={getUsageName(zone.usageType)}>
+                                {getUsageName(zone.usageType)}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-1.5" title="Area">
-                                <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
+                        <div className="flex items-center gap-4 text-muted-foreground">
+                            <div className="flex items-center gap-1.5" title="바닥 면적">
+                                <Ruler className="h-3.5 w-3.5" />
                                 <span>{zone.area} m²</span>
                             </div>
-                            <div className="flex items-center gap-1.5" title="Height">
-                                <span className="text-xs text-muted-foreground">H:</span>
+                            <div className="flex items-center gap-1.5" title="천정고">
+                                <MoveVertical className="h-3.5 w-3.5" />
                                 <span>{zone.height} m</span>
                             </div>
-                            <div className="flex items-center gap-1.5" title="Volume">
-                                <span className="text-xs text-muted-foreground">V:</span>
+                            <div className="flex items-center gap-1.5" title="체적">
+                                <Cuboid className="h-3.5 w-3.5" />
                                 <span>{zone.volume.toFixed(1)} m³</span>
                             </div>
                         </div>

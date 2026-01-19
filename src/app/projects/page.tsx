@@ -2,18 +2,35 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Folder } from "lucide-react";
-import { getProjects } from "@/services/project-service";
+import { Plus, Folder, Trash2 } from "lucide-react";
+import { getProjects, deleteProject } from "@/services/project-service";
 import { useAuth } from "@/lib/auth-context";
 import { Project } from "@/types/project";
-import { format } from "date-fns"; // You might need to install date-fns
+import { format } from "date-fns";
 
 export default function ProjectsPage() {
     const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const handleDeleteProject = async (e: React.MouseEvent, projectId: string, projectName: string) => {
+        e.stopPropagation();
+        if (!confirm(`'${projectName}' 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+            return;
+        }
+
+        try {
+            await deleteProject(projectId);
+            setProjects(projects.filter(p => p.id !== projectId));
+        } catch (error) {
+            console.error("Failed to delete project:", error);
+            alert("프로젝트 삭제에 실패했습니다.");
+        }
+    };
 
     useEffect(() => {
         async function fetchProjects() {
@@ -64,23 +81,44 @@ export default function ProjectsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {projects.map((project) => (
-                        <Card key={project.id} className="hover:bg-muted/50 transition-colors">
-                            <CardHeader>
-                                <CardTitle>{project.name}</CardTitle>
-                                <CardDescription>{project.location.city} • {project.location.climateZone}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                                    {project.description || "설명이 없습니다."}
-                                </p>
-                                <div className="flex justify-between items-center text-xs text-muted-foreground">
-                                    <span>수정일 {project.updatedAt ? project.updatedAt.toLocaleDateString() : "N/A"}</span>
-                                    <Button variant="secondary" size="sm" asChild>
-                                        <Link href={`/projects/${project.id}`}>열기</Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <div
+                            key={project.id}
+                            className="group relative cursor-pointer"
+                            onClick={() => router.push(`/projects/${project.id}`)}
+                        >
+                            <Card className="h-full hover:bg-muted/50 transition-colors">
+                                <CardHeader>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <CardTitle>{project.name}</CardTitle>
+                                            <CardDescription className="mt-1">
+                                                {project.location?.city ? (
+                                                    <span>{project.location.city} • {project.location.climateZone}</span>
+                                                ) : (
+                                                    <span>위치 정보 없음</span>
+                                                )}
+                                            </CardDescription>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4 h-10">
+                                        {project.description || "설명이 없습니다."}
+                                    </p>
+                                    <div className="flex justify-between items-center text-xs text-muted-foreground mt-auto">
+                                        <span>수정일 {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : "N/A"}</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => project.id && handleDeleteProject(e, project.id, project.name || "프로젝트")}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
                     ))}
                 </div>
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Surface, SurfaceType, Orientation } from "@/types/project";
+import { Surface, SurfaceType, Orientation, Construction } from "@/types/project";
 import { createSurface, updateSurface } from "@/services/surface-service";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
+// Use z.number() directly for stricter type inference if possible, but form inputs return strings usually.
+// z.coerce.number() is correct for handling "123" -> 123.
 const formSchema = z.object({
     name: z.string().min(1, "표면 이름을 입력해주세요."),
     type: z.enum([
@@ -45,30 +47,67 @@ interface SurfaceFormProps {
     surface?: Surface;
     onSuccess?: () => void;
     onCancel?: () => void;
+    constructions?: Construction[];
 }
 
-export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel }: SurfaceFormProps) {
+export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, constructions = [] }: SurfaceFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
     const form = useForm<SurfaceFormValues>({
-        resolver: zodResolver(formSchema),
+        // casting zodResolver to any as a workaround for strict type issues with coerce
+        resolver: zodResolver(formSchema) as any,
         defaultValues: {
             name: surface?.name || "",
             type: (surface?.type as any) || "wall_exterior",
             area: surface?.area || 0,
-            uValue: surface?.uValue || 0.2,
+            uValue: surface?.uValue || 0.2, // Default fallback
             orientation: surface?.orientation || "S",
             tilt: surface?.tilt !== undefined ? surface.tilt : 90,
         },
     });
+
+    const [selectedConstructionId, setSelectedConstructionId] = useState<string>(surface?.constructionId || "");
 
     // Watch type to conditionally show fields
     const surfaceType = form.watch("type");
     const isExterior = ["wall_exterior", "roof", "window", "door"].includes(surfaceType);
     const isHorizontal = ["roof", "floor_ground", "floor_interior"].includes(surfaceType);
 
-    const onSubmit = async (values: SurfaceFormValues) => {
+    // Filter constructions by type match
+    // Basic mapping: 
+    // - wall types -> constructions that are wall
+    // - roof types -> constructions that are roof
+    // - floor types -> constructions that are floor
+    // - window -> window
+    // - door -> door
+    const currentCategory = (() => {
+        if (surfaceType.startsWith("wall")) return "wall";
+        if (surfaceType.startsWith("roof")) return "roof";
+        if (surfaceType.startsWith("floor")) return "floor";
+        return surfaceType;
+    })();
+
+    const filteredConstructions = constructions.filter(c => {
+        if (c.type === surfaceType) return true; // Exact match
+        // Or Category match
+        if (currentCategory === "wall" && c.type.startsWith("wall")) return true;
+        if (currentCategory === "roof" && c.type.startsWith("roof")) return true;
+        if (currentCategory === "floor" && c.type.startsWith("floor")) return true;
+        if (currentCategory === "window" && c.type === "window") return true;
+        if (currentCategory === "door" && c.type === "door") return true;
+        return false;
+    });
+
+    const handleConstructionSelect = (id: string) => {
+        setSelectedConstructionId(id);
+        const constr = constructions.find(c => c.id === id);
+        if (constr) {
+            form.setValue("uValue", constr.uValue);
+        }
+    };
+
+    const onSubmit: SubmitHandler<SurfaceFormValues> = async (values) => {
         setLoading(true);
         setError("");
         try {
@@ -77,6 +116,7 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel }:
                 type: values.type as SurfaceType,
                 area: values.area,
                 uValue: values.uValue,
+                constructionId: selectedConstructionId || undefined,
             };
 
             if (isExterior) {
@@ -124,7 +164,10 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel }:
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>유형</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={(val) => {
+                                    field.onChange(val);
+                                    setSelectedConstructionId(""); // Reset selection on type change
+                                }} defaultValue={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="유형 선택" />
@@ -144,6 +187,39 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel }:
                             </FormItem>
                         )}
                     />
+
+                    {/* Construction Selection */}
+                    <div className="space-y-2 p-3 bg-muted/20 rounded-md border border-dashed">
+                        <div className="flex justify-between items-center">
+                            <FormLabel>구조체 선택 (Construction Preset)</FormLabel>
+                            <span className="text-xs text-muted-foreground">선택 시 열관류율 자동 입력</span>
+                        </div>
+                        <Select value={selectedConstructionId} onValueChange={handleConstructionSelect}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="구조체를 선택하세요 (선택 사항)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {filteredConstructions.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                        {c.name} (U={c.uValue})
+                                    </SelectItem>
+                                ))}
+                                {filteredConstructions.length === 0 && (
+                                    <div className="p-2 text-sm text-muted-foreground text-center">
+                                        해당 유형의 구조체가 없습니다.
+                                    </div>
+                                )}
+                            </SelectContent>
+                        </Select>
+                        {selectedConstructionId && (
+                            <div className="text-xs text-muted-foreground flex justify-between px-1">
+                                <span>선택됨: {constructions.find(c => c.id === selectedConstructionId)?.name}</span>
+                                <Button type="button" variant="ghost" size="sm" className="h-4 p-0 text-xs" onClick={() => handleConstructionSelect("")}>
+                                    선택 해제
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -177,8 +253,11 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel }:
                                         step="0.01"
                                         placeholder="0.20"
                                         {...field}
+                                        readOnly={!!selectedConstructionId}
+                                        className={selectedConstructionId ? "bg-muted" : ""}
                                     />
                                 </FormControl>
+                                {selectedConstructionId && <p className="text-xs text-muted-foreground">구조체에 의해 고정됨</p>}
                                 <FormMessage />
                             </FormItem>
                         )}

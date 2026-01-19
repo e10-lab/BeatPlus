@@ -26,8 +26,6 @@ const formSchema = z.object({
         message: "프로젝트 이름은 최소 2글자 이상이어야 합니다.",
     }),
     description: z.string().optional(),
-    city: z.string().min(1, { message: "도시를 입력해주세요." }),
-    climateZone: z.string().min(1, { message: "기후 구역을 선택해주세요." }),
 });
 
 export function ProjectForm() {
@@ -40,8 +38,6 @@ export function ProjectForm() {
         defaultValues: {
             name: "",
             description: "",
-            city: "",
-            climateZone: "",
         },
     });
 
@@ -56,10 +52,7 @@ export function ProjectForm() {
                 userId: user.uid,
                 name: values.name,
                 description: values.description,
-                location: {
-                    city: values.city,
-                    climateZone: values.climateZone,
-                },
+                location: {}, // Empty location initially
             });
             router.push("/projects");
         } catch (error: any) {
@@ -102,57 +95,8 @@ export function ProjectForm() {
                         </FormItem>
                     )}
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                        control={form.control}
-                        name="city"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>도시</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="서울" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="climateZone"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>기후 구역 (DIN 18599)</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="기후 구역 선택" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="TRY 01">TRY 01 (Bremerhaven)</SelectItem>
-                                        <SelectItem value="TRY 02">TRY 02 (Rostock)</SelectItem>
-                                        <SelectItem value="TRY 03">TRY 03 (Hamburg)</SelectItem>
-                                        <SelectItem value="TRY 04">TRY 04 (Potsdam)</SelectItem>
-                                        <SelectItem value="TRY 05">TRY 05 (Essen)</SelectItem>
-                                        <SelectItem value="TRY 06">TRY 06 (Bad Marienberg)</SelectItem>
-                                        <SelectItem value="TRY 07">TRY 07 (Kassel)</SelectItem>
-                                        <SelectItem value="TRY 08">TRY 08 (Braunlage)</SelectItem>
-                                        <SelectItem value="TRY 09">TRY 09 (Chemnitz)</SelectItem>
-                                        <SelectItem value="TRY 10">TRY 10 (Hof)</SelectItem>
-                                        <SelectItem value="TRY 11">TRY 11 (Fichtelberg)</SelectItem>
-                                        <SelectItem value="TRY 12">TRY 12 (Mannheim)</SelectItem>
-                                        <SelectItem value="TRY 13">TRY 13 (Mühldorf)</SelectItem>
-                                        <SelectItem value="TRY 14">TRY 14 (Stötten)</SelectItem>
-                                        <SelectItem value="TRY 15">TRY 15 (Garmisch)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormDescription>
-                                    표준 기상 데이터(TRY) 구역을 선택하세요.
-                                </FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                <div className="hidden">
+                    {/* Location fields removed from creation step */}
                 </div>
                 {error && (
                     <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm mb-4">

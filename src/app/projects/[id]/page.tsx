@@ -11,6 +11,8 @@ import { ResultsView } from "@/features/results/components/results-view";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Building2, MapPin, CalendarDays, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ProjectSettingsForm } from "@/features/input/components/project-settings-form";
+import { CLIMATE_ZONE_LABELS } from "@/lib/constants";
 
 export default function ProjectDetailsPage() {
     const params = useParams();
@@ -71,7 +73,10 @@ export default function ProjectDetailsPage() {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                             <MapPin className="h-4 w-4" />
-                            <span>{project.location.city} ({project.location.climateZone})</span>
+                            <span>
+                                {project.location?.city}
+                                {project.location?.climateZone ? ` (${CLIMATE_ZONE_LABELS[project.location.climateZone] || project.location.climateZone})` : ""}
+                            </span>
                         </div>
                         <div className="flex items-center gap-1">
                             <CalendarDays className="h-4 w-4" />
@@ -87,7 +92,7 @@ export default function ProjectDetailsPage() {
             </div>
 
             {/* Main Content Tabs */}
-            <Tabs defaultValue="geometry" className="w-full">
+            <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
                     <TabsTrigger value="overview">개요 (Overview)</TabsTrigger>
                     <TabsTrigger value="geometry">형상 (Geometry)</TabsTrigger>
@@ -95,12 +100,7 @@ export default function ProjectDetailsPage() {
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-6 space-y-4">
-                    <div className="p-4 border rounded-lg bg-muted/20">
-                        <h3 className="font-medium mb-2">프로젝트 설명</h3>
-                        <p className="text-muted-foreground">
-                            {project.description || "설명이 없습니다."}
-                        </p>
-                    </div>
+                    <ProjectSettingsForm project={project} onUpdate={setProject} />
                 </TabsContent>
 
                 <TabsContent value="geometry" className="mt-6">
