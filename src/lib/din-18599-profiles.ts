@@ -1,41 +1,41 @@
 export interface UsageProfile {
-    id: string; // DIN 18599-10 Profile ID or descriptive key
-    name: string; // Korean name (with original DIN number)
+    id: string; // DIN 18599-10 프로필 ID 또는 식별 키
+    name: string; // 한국어 명칭 (원본 DIN 번호 포함)
 
-    // 1. Usage & Operation Times
-    dailyUsageHours: number; // h (Nutzungszeit pro Tag)
-    annualUsageDays: number; // days (Nutzungstage pro Jahr)
-    usageHoursDay: number; // h (Tagbetrieb 07:00-18:00)
-    usageHoursNight: number; // h (Nachtbetrieb 18:00-07:00)
-    usageHoursStart: number; // Hour (0-24) - for display
-    usageHoursEnd: number; // Hour (0-24) - for display
-    hvacDailyOperationHours: number; // h (Betriebszeit RLT-Anlage)
-    hvacAnnualOperationDays: number; // days (Betriebstage RLT-Anlage)
+    // 1. 사용 및 운영 시간
+    dailyUsageHours: number; // h (일일 사용 시간)
+    annualUsageDays: number; // days (연간 사용 일수)
+    usageHoursDay: number; // h (주간 운영 07:00-18:00)
+    usageHoursNight: number; // h (야간 운영 18:00-07:00)
+    usageHoursStart: number; // Hour (0-24) - 표시용 시작 시간
+    usageHoursEnd: number; // Hour (0-24) - 표시용 종료 시간
+    hvacDailyOperationHours: number; // h (공조 설비 일일 가동 시간)
+    hvacAnnualOperationDays: number; // days (공조 설비 연간 가동 일수)
 
-    // 2. Lighting
-    illuminance: number; // lux (Wartungswert der Beleuchtungsstärke Em)
-    workplaneHeight: number; // m (Höhe der Nutzebene)
-    illuminanceDepreciationFactor: number; // k_L (Wartungsfaktor?) - usually reduction factor
-    lightingAbsenceFactor: number; // F_A (Absence factor for lighting)
-    partialOperationFactorLighting: number; // F_Te (Teilbetriebsfaktor)
+    // 2. 조명
+    illuminance: number; // lux (유지 조도 Em)
+    workplaneHeight: number; // m (작업면 높이)
+    illuminanceDepreciationFactor: number; // k_L (유지율/감광 보상률)
+    lightingAbsenceFactor: number; // F_A (조명 부재율/재실 감지 효과)
+    partialOperationFactorLighting: number; // F_Te (조명 부분 가동률)
 
-    // 3. Indoor Temperature
-    heatingSetpoint: number; // °C (Soll-Temperatur Heizen)
-    coolingSetpoint: number; // °C (Soll-Temperatur Kühlen)
-    heatingSetbackTemp: number; // °C (Absenk-Temperatur Heizen)
-    heatingDesignMinTemp: number; // °C (Auslegungstemperatur Heizen min)
-    coolingDesignMaxTemp: number; // °C (Auslegungstemperatur Kühlen max)
+    // 3. 실내 온도
+    heatingSetpoint: number; // °C (난방 설정 온도)
+    coolingSetpoint: number; // °C (냉방 설정 온도)
+    heatingSetbackTemp: number; // °C (난방 제어/저감 온도)
+    heatingDesignMinTemp: number; // °C (난방 설계 최저 온도)
+    coolingDesignMaxTemp: number; // °C (냉방 설계 최고 온도)
 
-    // 4. Indoor Climate
-    minOutdoorAir: number; // m³/(h·m²) or m³/(h·pers) - Simplified to area based for now
-    humidityRequirement: string; // e.g., "None", "40-60%"
-    minOutdoorAirFlow: number; // m³/(h·m²) (Außenluftvolumenstrom)
+    // 4. 실내 환경
+    minOutdoorAir: number; // m³/(h·m²) 또는 m³/(h·인) - 현재는 면적 기준으로 단순화됨
+    humidityRequirement: string; // 예: "None", "40-60%"
+    minOutdoorAirFlow: number; // m³/(h·m²) (외기 도입량)
 
-    // 5. HVAC System factors
-    hvacAbsenceFactor: number; // F_A,RLT
-    hvacPartialOperationFactor: number; // F_Te,RLT
+    // 5. 공조 시스템 계수
+    hvacAbsenceFactor: number; // F_A,RLT (공조 부재율)
+    hvacPartialOperationFactor: number; // F_Te,RLT (공조 부분 가동률)
 
-    // 6. Internal Gains
+    // 6. 내부 발열
     metabolicHeat: number; // Wh/(m²·d) (인체 발열)
     equipmentHeat: number; // Wh/(m²·d) (기기 발열)
 }

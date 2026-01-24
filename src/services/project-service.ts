@@ -67,3 +67,51 @@ export const deleteProject = async (id: string) => {
     const docRef = doc(db, PROJECTS_COLLECTION, id);
     await deleteDoc(docRef);
 };
+
+// Start of Added Code
+import { getZones, updateZone } from "./zone-service";
+import { getSurfaces } from "./surface-service";
+import { calculateProjectStats, ProjectStats } from "@/lib/standard-values";
+
+export const getProjectStats = async (projectId: string): Promise<ProjectStats> => {
+    // 1. Fetch all zones
+    const zones = await getZones(projectId);
+
+    // 2. Fetch all surfaces for all zones
+    // This could be optimized if we had a collectionGroup query or if surfaces were subcollections
+    // Currently surfaces are subcollections of zones: projects/{pid}/zones/{zid}/surfaces
+    // We need to iterate.
+    const surfacePromises = zones.map(zone => getSurfaces(projectId, zone.id!));
+    const surfacesArrays = await Promise.all(surfacePromises);
+    const allSurfaces = surfacesArrays.flat();
+
+    // 3. Calculate Stats
+    return calculateProjectStats(zones, allSurfaces);
+};
+
+export const updateProjectVentilation = async (
+    projectId: string,
+    config: {
+        type: "natural" | "mechanical";
+        heatRecoveryEfficiency: number;
+        n50: number;
+        isMeasured?: boolean;
+        hasALD?: boolean;
+    }
+) => {
+    // Sanitize config for Firestore (undefined not allowed)
+    const sanitizedConfig = {
+        ...config,
+        isMeasured: config.isMeasured ?? false
+    };
+
+    // 1. Update Project
+    await updateProject(projectId, { ventilationConfig: sanitizedConfig });
+
+    // 2. Update All Zones - REMOVED
+    // Zones now use linkedVentilationUnitIds or fallback to Project config dynamically.
+    // No need to copy values to Zone.
+
+    // const zones = await getZones(projectId);
+    // ...
+};

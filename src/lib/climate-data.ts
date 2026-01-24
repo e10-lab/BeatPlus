@@ -5,12 +5,12 @@ export interface WeatherStation {
     longitude: number;
     elevation: number; // 해발고도 (m)
     monthlyTemp: number[]; // 1월 ~ 12월 평균 기온 (°C)
-    monthlySolar: number[]; // 1월 ~ 12월 일평균 일사량 (kWh/m²/day) -> 월합계가 아니라 일평균으로 저장하는 것이 계산엔 더 유리할 수 있으나, 요구사항인 '월합계'를 고려해 주석 확인 필요. 보통 엔진은 월평균을 씀. 여기서는 일단 일평균(kWh/m2/day) or 월평균(MJ/m2) 등 단위 명확히. DIN 18599 usually uses Monthly Average External Temp and Monthly Global Irradiation (kWh/m2/month or MJ/m2/month).
-    // Let's use Monthly Total Irradiation (kWh/m²/month) as requested "월합계일사량".
+    monthlySolar: number[]; // 1월 ~ 12월 월간 총 일사량 (kWh/m²/month)
+    // 참고: 원래 설명에 있던 일평균(day) vs 월합계(month) 논의 결과, 월합계를 사용하기로 함.
 }
 
-// Data source: Simulated averages for 2021-2025 based on typical Korean climate patterns
-// In a real scenario, this would be populated from the processed CSV/JSON.
+// 데이터 출처: 2021-2025 표준 한국 기후 패턴에 기반한 시뮬레이션 평균값
+// 실제 시나리오에서는 처리된 CSV/JSON 파일 등에서 로드됨.
 export const KOREA_WEATHER_STATIONS: WeatherStation[] = [
     {
         id: 108,
@@ -18,10 +18,10 @@ export const KOREA_WEATHER_STATIONS: WeatherStation[] = [
         latitude: 37.5714,
         longitude: 126.9658,
         elevation: 85.5,
-        // Jan..Dec (Avg Temp 2021-2025 approx)
+        // 1월..12월 (2021-2025 평균 기온, 근사값)
         monthlyTemp: [-2.0, 1.5, 7.5, 14.0, 19.5, 23.5, 26.5, 27.0, 22.5, 15.5, 8.0, 0.5],
-        // Jan..Dec (Total Solar kWh/m²/month approx)
-        monthlySolar: [65.0, 85.0, 120.0, 145.0, 160.0, 155.0, 130.0, 140.0, 125.0, 100.0, 70.0, 60.0]
+        // 1월..12월 (월간 총 일사량 kWh/m²/month, 근사값) (요청된 "월합계일사량" 사용)
+        // DIN 18599 일반적으로 월평균 외기온도와 월간 총 일사량(kWh/m²/month 또는 MJ/m²/month)을 사용함.
     },
     {
         id: 112,

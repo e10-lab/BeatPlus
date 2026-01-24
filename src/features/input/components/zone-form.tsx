@@ -15,9 +15,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Zone, ZoneUsageType } from "@/types/project";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Zone, ZoneUsageType, VentilationUnit } from "@/types/project";
+import { getSurfaces } from "@/services/surface-service";
+import { Surface } from "@/types/project";
+import { GeometricAnalysis } from "./geometric-analysis";
 import { createZone, updateZone } from "@/services/zone-service";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Info, Clock, Lightbulb, Thermometer, Wind, Fan, Zap } from "lucide-react";
 import { DIN_18599_PROFILES, PROFILE_OPTIONS } from "@/lib/din-18599-profiles";
 import {
@@ -29,6 +33,12 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const formSchema = z.object({
     name: z.string().min(1, { message: "존 이름을 입력해주세요." }),
@@ -50,17 +60,33 @@ const formSchema = z.object({
     area: z.coerce.number().min(0.1, { message: "면적은 0보다 커야 합니다." }),
     height: z.coerce.number().min(0.1, { message: "천정고는 0보다 커야 합니다." }),
     heatingTemp: z.coerce.number().default(20),
-    coolingTemp: z.coerce.number().default(26),
+    coolingTemp: z.number().min(10).max(35),
+    thermalBridgeMode: z.number().optional(),
+    linkedVentilationUnitIds: z.array(z.string()).optional(),
+    ventilationMode: z.enum(["natural", "mechanical", "balanced_mech"]).optional(),
+    lightingPowerDensity: z.number().optional(),
+    lightingEfficacy: z.number().optional(),
+    // UI 로직을 위해 추가됨
+    isMechanical: z.boolean().optional(),
 });
+
+import { ProjectStats, calculateStandardN50 } from "@/lib/standard-values";
 
 interface ZoneFormProps {
     projectId: string;
     zone?: Zone; // If provided, we are in edit mode
-    onSuccess?: () => void;
+    onSuccess?: (zone: Zone) => void;
     onCancel?: () => void;
+    projectStats?: ProjectStats;
+    projectVentilation?: {
+        type: "natural" | "mechanical";
+        heatRecoveryEfficiency: number;
+        n50: number;
+    };
+    units?: VentilationUnit[];
 }
 
-export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps) {
+export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, projectVentilation, units = [] }: ZoneFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -71,21 +97,57 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
             usageType: zone?.usageType || "1_single_office",
             area: zone?.area || 0,
             height: zone?.height || 3.0,
-            heatingTemp: zone?.temperatureSetpoints?.heating || 20,
-            coolingTemp: zone?.temperatureSetpoints?.cooling || 26,
+            heatingTemp: zone?.temperatureSetpoints.heating ?? 20,
+            coolingTemp: zone?.temperatureSetpoints.cooling ?? 26,
+            thermalBridgeMode: zone?.thermalBridgeMode ?? 0.10,
+            linkedVentilationUnitIds: zone?.linkedVentilationUnitIds || [],
+            ventilationMode: zone?.ventilationMode || "natural",
+            lightingPowerDensity: zone?.lighting?.powerDensity,
+            lightingEfficacy: zone?.lighting?.efficacy ?? 60,
+            isMechanical: (zone?.linkedVentilationUnitIds || []).length > 0,
         },
     });
 
-    // Watch usageType to show details and auto-update
+    // const isMech = form.watch("isMechanical");
+    // isMechanical 필드는 UI 로직에서 제거되었습니다. (자동 판단)
+
+    useEffect(() => {
+        if (zone) {
+            form.reset({
+                name: zone.name,
+                usageType: zone.usageType || "1_single_office",
+                area: zone.area,
+                height: zone.height,
+                heatingTemp: zone.temperatureSetpoints?.heating || 20,
+                coolingTemp: zone.temperatureSetpoints?.cooling || 26,
+                thermalBridgeMode: zone.thermalBridgeMode || 0.10,
+                lightingEfficacy: zone.lighting?.efficacy || 60,
+                lightingPowerDensity: zone.lighting?.powerDensity || undefined,
+                linkedVentilationUnitIds: zone.linkedVentilationUnitIds || [],
+                ventilationMode: zone.ventilationMode || "natural",
+                isMechanical: zone.ventilationMode !== "natural",
+            });
+        } else {
+            form.reset({
+                name: "",
+                usageType: "1_single_office",
+                area: 0,
+                height: 3.0,
+                heatingTemp: 20,
+                coolingTemp: 26,
+                thermalBridgeMode: 0.10,
+                lightingEfficacy: 60,
+                lightingPowerDensity: undefined,
+                linkedVentilationUnitIds: [],
+                ventilationMode: "natural",
+                isMechanical: false,
+            });
+        }
+    }, [zone, form]);
+
+    // usageType을 감시하여 세부 정보를 표시하고 자동 업데이트
     const selectedUsage = form.watch("usageType");
     const selectedProfile = DIN_18599_PROFILES[selectedUsage as string];
-
-    // Effect to update temperature setpoints when usage type changes
-    // Only update if the user hasn't manually changed them?
-    // For now, we always update on profile switch for convenience.
-    // We wrapped this in a useEffect to avoid render loop, but need to be careful.
-    // Actually, onValueChange in the Select is safer than useEffect for this.
-    // But since multiple fields need update, we can use the onChange handler in the render.
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setLoading(true);
@@ -96,21 +158,27 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                 usageType: values.usageType as ZoneUsageType,
                 area: values.area,
                 height: values.height,
-                volume: values.area * values.height, // Auto-calculate volume
+                volume: values.area * values.height,
                 temperatureSetpoints: {
                     heating: values.heatingTemp,
                     cooling: values.coolingTemp,
                 },
+                thermalBridgeMode: values.thermalBridgeMode,
+                lighting: {
+                    efficacy: values.lightingEfficacy || 60,
+                    ...(values.lightingPowerDensity !== undefined ? { powerDensity: values.lightingPowerDensity } : {}),
+                },
+                linkedVentilationUnitIds: values.linkedVentilationUnitIds || [],
+                ventilationMode: ((values.linkedVentilationUnitIds && values.linkedVentilationUnitIds.length > 0) ? "mechanical" : "natural") as "natural" | "mechanical" | "balanced_mech",
             };
 
             if (zone && zone.id) {
                 await updateZone(projectId, zone.id, zoneData);
+                if (onSuccess) onSuccess({ ...zone, ...zoneData });
             } else {
-                await createZone(projectId, zoneData);
+                const newId = await createZone(projectId, zoneData);
+                if (onSuccess) onSuccess({ id: newId, projectId, ...zoneData });
             }
-
-            form.reset();
-            if (onSuccess) onSuccess();
         } catch (e: any) {
             console.error("Zone save error:", e);
             setError(e.message || "Failed to save zone");
@@ -163,7 +231,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                                                     </DialogHeader>
 
                                                     <div className="grid grid-cols-1 gap-6 mt-4">
-                                                        {/* 1. 이용 및 운영 시간 */}
                                                         <Card>
                                                             <CardHeader className="pb-2 bg-muted/40">
                                                                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -182,8 +249,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                                                                 <div className="flex justify-between"><span>공조 연간 운전</span> <span className="font-mono">{selectedProfile.hvacAnnualOperationDays} d</span></div>
                                                             </CardContent>
                                                         </Card>
-
-                                                        {/* 2. 조명 */}
                                                         <Card>
                                                             <CardHeader className="pb-2 bg-muted/40">
                                                                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -196,10 +261,11 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                                                                 <div className="flex justify-between"><span>조도 감소 계수 (kL)</span> <span className="font-mono">{selectedProfile.illuminanceDepreciationFactor}</span></div>
                                                                 <div className="flex justify-between"><span>상대적 부재율 (FA)</span> <span className="font-mono">{selectedProfile.lightingAbsenceFactor}</span></div>
                                                                 <div className="flex justify-between"><span>부분 가동 계수 (FTe)</span> <span className="font-mono">{selectedProfile.partialOperationFactorLighting}</span></div>
+                                                                <div className="border-t my-2" />
+                                                                <div className="flex justify-between text-muted-foreground mr-1"><span>기본 광효율 (가정)</span> <span className="font-mono">60 lm/W</span></div>
+                                                                <div className="flex justify-between font-medium"><span>추정 전력 밀도</span> <span className="font-mono">{(selectedProfile.illuminance / 60).toFixed(1)} W/m²</span></div>
                                                             </CardContent>
                                                         </Card>
-
-                                                        {/* 3. 실내 온도 */}
                                                         <Card>
                                                             <CardHeader className="pb-2 bg-muted/40">
                                                                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -215,8 +281,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                                                                 <div className="flex justify-between"><span>설계 최대 (냉방)</span> <span className="font-mono">{selectedProfile.coolingDesignMaxTemp} °C</span></div>
                                                             </CardContent>
                                                         </Card>
-
-                                                        {/* 4. 실내 기후 */}
                                                         <Card>
                                                             <CardHeader className="pb-2 bg-muted/40">
                                                                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -229,8 +293,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                                                                 <div className="flex justify-between"><span>최소 외기 체적 유량</span> <span className="font-mono">{selectedProfile.minOutdoorAirFlow} m³/(h·m²)</span></div>
                                                             </CardContent>
                                                         </Card>
-
-                                                        {/* 5. 공조 시스템 */}
                                                         <Card>
                                                             <CardHeader className="pb-2 bg-muted/40">
                                                                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -242,8 +304,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                                                                 <div className="flex justify-between"><span>부분 가동 계수 (FTe,RLT)</span> <span className="font-mono">{selectedProfile.hvacPartialOperationFactor}</span></div>
                                                             </CardContent>
                                                         </Card>
-
-                                                        {/* 6. 내부 열획득 */}
                                                         <Card>
                                                             <CardHeader className="pb-2 bg-muted/40">
                                                                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -263,7 +323,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                                     <Select
                                         onValueChange={(val) => {
                                             field.onChange(val);
-                                            // Auto-update values
+                                            // 값 자동 업데이트
                                             const p = DIN_18599_PROFILES[val];
                                             if (p) {
                                                 form.setValue("heatingTemp", p.heatingSetpoint);
@@ -321,7 +381,114 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel }: ZoneFormProps
                     />
                 </div>
 
+                {/* Ventilation Settings */}
+                <div className="space-y-4 border rounded-md p-4 bg-muted/20">
+                    <h3 className="font-medium flex items-center gap-2">
+                        <Fan className="h-4 w-4" />
+                        환기 설정 (Ventilation)
+                    </h3>
 
+                    {/* Ventilation Units Multi-Select */}
+                    {units.length > 0 ? (
+                        <FormField
+                            control={form.control}
+                            name="linkedVentilationUnitIds"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <FormLabel>연결된 장비 (AHU/ERV)</FormLabel>
+                                        <span className="text-xs text-muted-foreground">
+                                            {field.value?.length ? "기계 환기 적용됨" : "자연 환기"}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2 border rounded-md p-2 bg-background max-h-40 overflow-y-auto">
+                                        {units.map((u) => (
+                                            <div key={u.id} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    checked={field.value?.includes(u.id)}
+                                                    onCheckedChange={(checked: boolean) => {
+                                                        const current = field.value || [];
+                                                        if (checked) {
+                                                            field.onChange([...current, u.id]);
+                                                        } else {
+                                                            field.onChange(current.filter((id) => id !== u.id));
+                                                        }
+                                                    }}
+                                                />
+                                                <span className="text-sm">
+                                                    {u.name} <span className="text-xs text-muted-foreground">({u.type}, {u.heatRecoveryEfficiency}%)</span>
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <FormDescription>
+                                        이 존에 공기를 공급하는 장비를 선택하세요. 장비가 연결되면 자동으로 기계 환기로 계산됩니다.
+                                        <br />
+                                        환기량은 연결된 장비의 급/배기량 설정을 따릅니다.
+                                    </FormDescription>
+                                </FormItem>
+                            )}
+                        />
+                    ) : (
+                        <div className="text-sm text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+                            등록된 공조 장비가 없습니다. '설비' 탭에서 먼저 장비를 추가해주세요.
+                        </div>
+                    )}
+                </div>
+
+
+
+                {/* Lighting Settings */}
+                <div className="space-y-4 border rounded-md p-4 bg-muted/20">
+                    <h3 className="font-medium flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4" />
+                        조명 설정 (선택사항)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="lightingEfficacy"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex justify-between">
+                                        광효율 (lm/W)
+                                        <span className="text-xs text-muted-foreground font-normal">기본: 60 (형광등/LED)</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="60" {...field} />
+                                    </FormControl>
+                                    <FormDescription>
+                                        LED 등 고효율 조명 적용 시 100~130 입력
+                                    </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="lightingPowerDensity"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex justify-between">
+                                        설치 전력 밀도 (W/m²)
+                                        <span className="text-xs text-muted-foreground font-normal">
+                                            자동 계산: {(selectedProfile && form.getValues("lightingEfficacy") && Number(form.getValues("lightingEfficacy")) > 0)
+                                                ? (selectedProfile.illuminance / Number(form.getValues("lightingEfficacy"))).toFixed(1)
+                                                : "-"}
+                                        </span>
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input type="number" step="0.1" placeholder="직접 입력 시 자동 계산 무시" {...field} />
+                                    </FormControl>
+                                    <FormDescription>
+                                        직접 입력하지 않으면 조도/광효율로 계산됨
+                                    </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                </div>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
 

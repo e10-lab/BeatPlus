@@ -3,7 +3,7 @@ import { FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ChevronUp, ChevronDown } from "lucide-react";
+import { Trash2, Plus, GripVertical } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_MATERIALS, CATEGORY_LABELS } from "@/lib/materials";
 import { useState, useEffect } from "react";
@@ -13,13 +13,14 @@ interface LayerRowProps {
     index: number;
     remove: (index: number) => void;
     insert: (index: number, value: any) => void;
-    move: (from: number, to: number) => void;
     length: number;
     isLastLayer: boolean;
     catType: "window" | "std";
+    parentCategory: string; // Passed from parent to control filtering
+    dragHandleProps?: any; // DndKit listeners
 }
 
-export const LayerRow = ({ form, index, remove, insert, move, length, isLastLayer, catType }: LayerRowProps) => {
+export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, catType, parentCategory, dragHandleProps }: LayerRowProps) => {
     // Watch the material ID to derive/sync category
     const materialId = form.watch(`layers.${index}.materialId`);
 
@@ -49,7 +50,8 @@ export const LayerRow = ({ form, index, remove, insert, move, length, isLastLaye
     // Derived lists
     // Filter out window-related categories for standard layers and add 'custom'
     const availableCategories: string[] = Array.from(new Set(DEFAULT_MATERIALS.map(m => m.category)))
-        .filter(c => !['glass', 'gas', 'air'].includes(c));
+        .filter(c => !['glass', 'gas', 'air'].includes(c))
+        .filter(c => c !== 'door' || parentCategory === 'door'); // Hide door materials unless parent is door
     availableCategories.push('custom');
 
     const filteredMaterials = DEFAULT_MATERIALS.filter(m => m.category === category);
@@ -69,25 +71,10 @@ export const LayerRow = ({ form, index, remove, insert, move, length, isLastLaye
         <div className="flex flex-col">
             {/* Desktop Grid Layout */}
             <div className="hidden md:grid grid-cols-[30px_220px_1fr_100px_120px_90px] gap-4 items-center mb-2">
-                {/* 0. Index */}
-                <div className="flex flex-col items-center gap-0.5">
-                    <button
-                        type="button"
-                        onClick={() => move(index, index - 1)}
-                        disabled={index === 0}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-                    >
-                        <ChevronUp className="w-3 h-3" />
-                    </button>
-                    <span className="text-xs font-mono text-muted-foreground">{index + 1}</span>
-                    <button
-                        type="button"
-                        onClick={() => move(index, index + 1)}
-                        disabled={index === length - 1}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-                    >
-                        <ChevronDown className="w-3 h-3" />
-                    </button>
+                {/* 0. Index & Drag Handle */}
+                <div className="flex flex-col items-center justify-center gap-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground" {...dragHandleProps}>
+                    <GripVertical className="w-4 h-4" />
+                    <span className="text-xs font-mono">{index + 1}</span>
                 </div>
 
                 {/* 1. Category */}

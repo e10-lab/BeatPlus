@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useParams, useRouter } from "next/navigation";
 import { Project } from "@/types/project";
 import { getProject } from "@/services/project-service";
@@ -20,6 +21,8 @@ export default function ProjectDetailsPage() {
     const { user, loading: authLoading } = useAuth();
     const [project, setProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const [activeTab, setActiveTab] = useState("overview");
 
     const projectId = params.id as string;
 
@@ -58,8 +61,9 @@ export default function ProjectDetailsPage() {
 
     return (
         <div className="container mx-auto py-8 space-y-8">
-            {/* Header Section */}
+            {/* Header Section (remains same) */}
             <div className="flex flex-col space-y-4 md:flex-row md:justify-between md:items-start">
+                {/* ... content omitted for brevity, keeping existing header ... */}
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => router.push("/projects")} className="-ml-3 text-muted-foreground">
@@ -70,6 +74,7 @@ export default function ProjectDetailsPage() {
                         <Building2 className="h-8 w-8 text-primary" />
                         {project.name}
                     </h1>
+                    {/* ... rest of header ... */}
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                             <MapPin className="h-4 w-4" />
@@ -92,7 +97,7 @@ export default function ProjectDetailsPage() {
             </div>
 
             {/* Main Content Tabs */}
-            <Tabs defaultValue="overview" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
                     <TabsTrigger value="overview">개요 (Overview)</TabsTrigger>
                     <TabsTrigger value="geometry">형상 (Geometry)</TabsTrigger>
@@ -108,7 +113,7 @@ export default function ProjectDetailsPage() {
                 </TabsContent>
 
                 <TabsContent value="results" className="mt-6">
-                    <ResultsView projectId={params.id as string} />
+                    <ResultsView projectId={params.id as string} isActive={activeTab === "results"} />
                 </TabsContent>
             </Tabs>
         </div>

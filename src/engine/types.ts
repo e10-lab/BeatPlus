@@ -2,15 +2,15 @@
 import { Project, Zone, Surface, SurfaceType } from "@/types/project";
 
 export interface ZoneInput extends Zone {
-    projectId: string; // Ensure projectId is present
+    projectId: string; // 프로젝트 ID 필수
     surfaces: Surface[];
 }
 
 export interface MonthlyClimate {
     month: number;
-    Te: number; // External Temperature (°C)
-    Is_Horiz: number; // Global Solar Radiation horizontal (W/m² or kWh/m² depending on logic, let's use W/m² avg or kWh/m² month)
-    // Actually DIN 18599 usually works with mean monthly values
+    Te: number; // 외기 온도 (°C)
+    Is_Horiz: number; // 수평 전일사량 (W/m² 또는 kWh/m²)
+    // DIN 18599는 일반적으로 월평균 값을 사용함
 }
 
 export interface CalculationResults {
@@ -22,27 +22,29 @@ export interface CalculationResults {
         specificHeatingDemand: number; // kWh/m²a
         specificCoolingDemand: number; // kWh/m²a
     };
+    warnings?: string[];
 }
 
 export interface MonthlyResult {
     month: number;
-    // Heat Losses
-    QT: number; // Transmission (kWh)
-    QV: number; // Ventilation (kWh)
-    Qloss: number; // Total Loss (kWh)
+    // 열 손실 (Heat Losses)
+    QT: number; // 전열 손실 (kWh)
+    QV: number; // 환기 손실 (kWh)
+    Qloss: number; // 총 열손실 (kWh)
 
-    // Heat Gains
-    QS: number; // Solar (kWh)
-    QI: number; // Internal (kWh)
-    Qgain: number; // Total Gain (kWh)
+    // 열 획득 (Heat Gains)
+    QS: number; // 일사 획득 (kWh)
+    QI: number; // 내부 발열 획득 (kWh)
+    Qgain: number; // 총 열획득 (kWh)
 
-    // Ratios
-    gamma: number; // Gain/Loss ratio
-    eta: number; // Utilization factor
+    // 효율 및 비율 (Ratios)
+    gamma: number; // 획득/손실 비 (Gain/Loss ratio)
+    eta: number; // 이용 효율 (Utilization factor)
 
-    // Final Demand
-    Qh: number; // Heating Energy Demand (kWh)
-    Qc: number; // Cooling Energy Demand (kWh)
+    // 최종 요구량 (Final Demand)
+    Qh: number; // 난방 에너지 요구량 (kWh)
+    Qc: number; // 냉방 에너지 요구량 (kWh)
+    warnings?: string[];
 }
 
 export interface ClimateData {

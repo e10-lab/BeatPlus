@@ -6,24 +6,45 @@ export interface Project {
     createdAt: Date;
     updatedAt: Date;
     location?: {
-        address?: string; // 기본 주소 (Road Address)
-        detailAddress?: string; // 상세 주소 (User Input, e.g. Apt Unit)
+        address?: string; // 기본 주소 (도로명 주소)
+        detailAddress?: string; // 상세 주소 (사용자 입력, 예: 동/호수)
         city?: string;
         zipCode?: string;
         latitude?: number;
         longitude?: number;
-        climateZone?: string; // DIN 18599 Climate Zone (e.g., "TRY 05")
+        climateZone?: string; // DIN 18599 기후 구역 (예: "TRY 05")
     };
     siteArea?: number; // 대지면적 (m²)
     buildingArea?: number; // 건축면적 (m²)
     totalArea?: number; // 연면적 (m²)
-    mainPurpose?: string; // 주 용도 (e.g., 업무시설)
-    mainStructure?: string; // 주 구조 (e.g., 철근콘크리트)
-    scale?: string; // 규모 (e.g., 지하1층 지상3층)
+    mainPurpose?: string; // 주 용도 (예: 업무시설)
+    mainStructure?: string; // 주 구조 (예: 철근콘크리트)
+    scale?: string; // 규모 (예: 지하1층 지상3층)
     permitDate?: string; // 허가일 (YYYY-MM-DD)
     constructionStartDate?: string; // 착공일 (YYYY-MM-DD)
     usageApprovalDate?: string; // 사용승인일 (YYYY-MM-DD)
-    weatherStationId?: number; // 기상 관측소 ID (Foreign Key to WeatherStation)
+    weatherStationId?: number; // 기상 관측소 ID (WeatherStation 외래 키)
+    ventilationConfig?: {
+        type: "natural" | "mechanical";
+        systemType?: "balanced" | "exhaust"; // 신규: 열회수와 분리됨
+        heatRecoveryEfficiency: number; // 0-100%
+        infiltrationCategory?: "I" | "II" | "III" | "IV"; // DIN V 18599-2 표 6
+        hasALD?: boolean; // 공기 전달 장치 (Air Transfer Devices)
+        n50: number; // 계산된 표준 n50 값 (또는 조회값)
+        isMeasured?: boolean; // true일 경우, n50을 수동으로 입력함
+    };
+    ventilationUnits?: VentilationUnit[];
+}
+
+export interface VentilationUnit {
+    id: string;
+    name: string;
+    type: "balanced" | "exhaust" | "supply";
+    category?: "fan" | "erv" | "ahu"; // UI 분류 카테고리
+    heatRecoveryEfficiency: number; // 0-100%
+    supplyFanPower?: number; // SFP [Wh/m³] 또는 전력 [kW] - 현재는 선택 사항
+    supplyFlowRate?: number; // m³/h (선택 사항: 명시적 급기 풍량)
+    exhaustFlowRate?: number; // m³/h (선택 사항: 명시적 배기 풍량)
 }
 
 export type ZoneUsageType =
@@ -53,13 +74,22 @@ export interface Zone {
         heating: number; // °C
         cooling: number; // °C
     };
+    thermalBridgeMode?: number; // 0.05, 0.10, or 0.15
+    lighting?: {
+        powerDensity?: number; // W/m² (Optional override)
+        efficacy?: number; // lm/W (Optional override, default ~60)
+    };
+    orderIndex?: number;
+    isExcluded?: boolean;
+    linkedVentilationUnitIds?: string[]; // Reference to multiple VentilationUnits
+    ventilationMode?: "natural" | "mechanical" | "balanced_mech"; // Explicit mode per zone
 }
 
 export type SurfaceType =
     | "wall_exterior"
     | "wall_interior"
     | "wall_ground" // New: Wall against ground
-    | "roof"
+    | "roof_exterior" // Renamed from 'roof' for clarity
     | "roof_interior" // For indirect exposure (e.g. ceiling under unconditioned space, though usually floor_interior covers this, but for Top roof structure it might be needed)
     | "roof_ground" // For underground roof? Or similar.
     | "floor_ground"
@@ -68,20 +98,23 @@ export type SurfaceType =
     | "window"
     | "door";
 
-export type Orientation = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW" | "Horiz";
+export type Orientation = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW" | "Horiz" | "NoExposure";
 
 export interface Surface {
     id?: string;
-    zoneId: string; // Surfaces belong to a zone
+    zoneId: string; // 표면이 속한 존
     name: string;
     type: SurfaceType;
     area: number; // m²
     uValue: number; // W/(m²K)
     orientation?: Orientation;
-    tilt?: number; // degrees (0 = horizontal, 90 = vertical)
-    reductionFactor?: number; // fx values for shading etc.
-    windowArea?: number; // if wall contains Window, simplified approach
-    constructionId?: string; // Reference to a Construction
+    tilt?: number; // 각도 (0 = 수평, 90 = 수직)
+    reductionFactor?: number; // 차양 등을 위한 fx 값
+    windowArea?: number; // 벽체에 포함된 창호 면적 (약식 계산용)
+    absorptionCoefficient?: number; // alpha (0.0 - 1.0), 불투명체 기본값 0.5
+    shgc?: number; // 태양열 취득 계수 (창호/문 전용, Envelope Type에서 가져옴)
+    constructionId?: string; // 구조체(Construction) 참조
+    orderIndex?: number;
 }
 
 export interface Material {
@@ -105,19 +138,22 @@ export interface Layer {
 
 export interface Construction {
     id: string;
-    projectId: string; // Belongs to a project (or "global" if we want templates later)
+    projectId: string; // 프로젝트 소속 (템플릿 확장을 위해 'global' 가능)
     name: string;
-    type: SurfaceType; // Construction is specific to wall, roof, floor, etc.
+    type: SurfaceType; // 구조체는 벽, 지붕, 바닥 등 특정 유형에 속함
     layers: Layer[];
 
-    // Surface Heat Transfer Resistances (m²K/W)
-    r_si: number; // Internal
-    r_se: number; // External
+    // 표면 열전달 저항 (m²K/W)
+    r_si: number; // 내부
+    r_se: number; // 외부
 
-    // Frame (Window/Door only)
+    // 프레임 (창호/문 전용)
     frameId?: string;
 
-    // Computed
+    // 계산된 값
     uValue: number; // W/m²K
+    shgc?: number; // 태양열 취득 계수 (창호/문 전용)
+    absorptionCoefficient?: number; // 태양 복사 흡수율 (불투명 외피 전용)
     totalThickness: number; // m
+    orderIndex?: number; // 드래그 앤 드롭 정렬용
 }

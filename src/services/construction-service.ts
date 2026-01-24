@@ -8,33 +8,30 @@ import {
     deleteDoc,
     query,
     orderBy,
-    setDoc
+    setDoc,
+    writeBatch
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Construction } from "@/types/project";
+import { getZones } from "./zone-service";
+import { getSurfaces, updateSurface, deleteSurface } from "./surface-service";
 
 const PROJECTS_COLLECTION = "projects";
 const CONSTRUCTIONS_COLLECTION = "constructions";
 
+const cleanUndefined = (obj: any): any => {
+    return JSON.parse(JSON.stringify(obj));
+};
+
 export const createConstruction = async (projectId: string, constructionData: Omit<Construction, "id" | "projectId"> & { id?: string }) => {
     const constructionsRef = collection(db, PROJECTS_COLLECTION, projectId, CONSTRUCTIONS_COLLECTION);
 
-    // If ID is provided (e.g. uuid from frontend), use it. Otherwise auto-gen.
-    // However, addDoc auto-gens. If we want specific ID, use setDoc with doc().
-    // For consistency with typical Firestore usage, if we have an ID from frontend, we might want to keep it.
-    // Let's check zone-service: it uses addDoc.
-    // But our ConstructionForm generates a uuid.
-    // Let's prefer using the frontend generated ID if available, or just omit "id" field and let Firestore generate,
-    // then return it.
-    // Actually ConstructionForm uses uuidv4() for keying.
-    // Let's use addDoc for simplicity and let Firestore assign the doc ID.
-    // We will overwrite the "id" field in the data with the doc ID on retrieval.
-
-    // Removing 'id' from data payload if it exists to avoid duplication inside the doc
+    // Removing 'id' from data payload if it exists
     const { id, ...data } = constructionData as any;
+    const cleanedData = cleanUndefined(data);
 
     const docRef = await addDoc(constructionsRef, {
-        ...data,
+        ...cleanedData,
         projectId,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -49,23 +46,73 @@ export const getConstructions = async (projectId: string): Promise<Construction[
     const q = query(constructionsRef, orderBy("name"));
     const querySnapshot = await getDocs(q);
 
-    return querySnapshot.docs.map((doc) => ({
+    const data = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
     })) as Construction[];
+
+    // Client-side sort: orderIndex asc, then name asc
+    return data.sort((a, b) => {
+        const orderA = a.orderIndex ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.orderIndex ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name);
+    });
 };
 
 export const updateConstruction = async (projectId: string, constructionId: string, constructionData: Partial<Construction>) => {
     const constructionRef = doc(db, PROJECTS_COLLECTION, projectId, CONSTRUCTIONS_COLLECTION, constructionId);
     // Remove id from update payload
     const { id, ...data } = constructionData as any;
+    const cleanedData = cleanUndefined(data);
+
     await updateDoc(constructionRef, {
-        ...data,
+        ...cleanedData,
         updatedAt: new Date()
     });
+
+    // Cascade update: If U-value changed, update linked surfaces
+    if (constructionData.uValue !== undefined) {
+        const zones = await getZones(projectId);
+        for (const zone of zones) {
+            if (!zone.id) continue;
+            const surfaces = await getSurfaces(projectId, zone.id);
+            const linkedSurfaces = surfaces.filter(s => s.constructionId === constructionId);
+
+            await Promise.all(linkedSurfaces.map(surface =>
+                updateSurface(projectId, zone.id!, surface.id!, { uValue: constructionData.uValue })
+            ));
+        }
+    }
 };
 
 export const deleteConstruction = async (projectId: string, constructionId: string) => {
     const constructionRef = doc(db, PROJECTS_COLLECTION, projectId, CONSTRUCTIONS_COLLECTION, constructionId);
     await deleteDoc(constructionRef);
+
+    // Cascade delete: Remove reference from surfaces
+    const zones = await getZones(projectId);
+    for (const zone of zones) {
+        if (!zone.id) continue;
+        const surfaces = await getSurfaces(projectId, zone.id);
+        const linkedSurfaces = surfaces.filter(s => s.constructionId === constructionId);
+
+        await Promise.all(linkedSurfaces.map(surface =>
+            deleteSurface(projectId, zone.id!, surface.id!)
+        ));
+    }
+};
+
+export const reorderConstructions = async (projectId: string, orderedIds: string[]) => {
+    const batch = writeBatch(db);
+
+    orderedIds.forEach((id, index) => {
+        const docRef = doc(db, PROJECTS_COLLECTION, projectId, CONSTRUCTIONS_COLLECTION, id);
+        batch.update(docRef, {
+            orderIndex: index,
+            updatedAt: new Date()
+        });
+    });
+
+    await batch.commit();
 };
