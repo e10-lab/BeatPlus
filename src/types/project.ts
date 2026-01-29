@@ -34,6 +34,14 @@ export interface Project {
         isMeasured?: boolean; // true일 경우, n50을 수동으로 입력함
     };
     ventilationUnits?: VentilationUnit[];
+    automationConfig?: BuildingAutomationConfig; // DIN 18599-11
+}
+
+export interface BuildingAutomationConfig {
+    automationClass: "A" | "B" | "C" | "D"; // A: High performance, D: Non-energy efficient
+    heatingControl: "manual" | "thermostatic" | "electronic_pi" | "bacs_ref";
+    coolingControl?: "manual" | "thermostatic" | "electronic_pi" | "bacs_ref";
+    ventilationControl?: "manual" | "time_scheduled" | "demand_controlled";
 }
 
 export interface VentilationUnit {
@@ -83,6 +91,8 @@ export interface Zone {
     isExcluded?: boolean;
     linkedVentilationUnitIds?: string[]; // Reference to multiple VentilationUnits
     ventilationMode?: "natural" | "mechanical" | "balanced_mech"; // Explicit mode per zone
+    thermalCapacitySpecific?: number; // Wh/(m²·K) - Specific Thermal Capacity
+    heatingReducedMode?: "setback" | "shutdown"; // Night/Weekend operation mode
 }
 
 export type SurfaceType =
@@ -113,6 +123,12 @@ export interface Surface {
     windowArea?: number; // 벽체에 포함된 창호 면적 (약식 계산용)
     absorptionCoefficient?: number; // alpha (0.0 - 1.0), 불투명체 기본값 0.5
     shgc?: number; // 태양열 취득 계수 (창호/문 전용, Envelope Type에서 가져옴)
+    shading?: {
+        hasDevice: boolean;
+        type?: "internal" | "external" | "intermediate"; // 차양 장치 위치
+        fcValue: number; // 태양열 취득 감소 계수 (Reduction Factor, 0.0 - 1.0)
+        operationMode?: "manual" | "automatic" | "fixed";
+    };
     constructionId?: string; // 구조체(Construction) 참조
     orderIndex?: number;
 }

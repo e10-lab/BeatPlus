@@ -1,6 +1,7 @@
 export interface UsageProfile {
     id: string; // DIN 18599-10 프로필 ID 또는 식별 키
     name: string; // 한국어 명칭 (원본 DIN 번호 포함)
+    version?: "2011" | "2018" | "2025"; // DIN/TS 18599 버전 구분
 
     // 1. 사용 및 운영 시간
     dailyUsageHours: number; // h (일일 사용 시간)

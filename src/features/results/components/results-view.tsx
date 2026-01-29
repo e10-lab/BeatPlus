@@ -11,15 +11,18 @@ import { Loader2 } from "lucide-react";
 import { Zone } from "@/types/project";
 import { MonthlyDemandChart } from "./monthly-demand-chart";
 import { EnergyBalanceChart } from "./energy-balance-chart";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ResultsViewProps {
     projectId: string;
-    isActive?: boolean; // If true, trigger data reload
+    isActive?: boolean;
 }
 
 export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
     const [loading, setLoading] = useState(true);
     const [results, setResults] = useState<CalculationResults | null>(null);
+    const [selectedZoneId, setSelectedZoneId] = useState<string>("total");
 
     useEffect(() => {
         if (!isActive) return; // Skip if not active tab
@@ -78,17 +81,46 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
         return <div>결과를 불러올 수 없습니다.</div>;
     }
 
+    // Determine data to show based on selection
+    const isTotal = selectedZoneId === "total";
+    const currentZone = !isTotal ? results.zones.find(z => z.zoneId === selectedZoneId) : null;
+
+    // Safety check
+    const monthlyData = isTotal ? results.monthly : (currentZone?.monthly || []);
+    const yearlyData = isTotal ? results.yearly : (currentZone?.yearly || {
+        heatingDemand: 0, coolingDemand: 0, totalArea: 0, specificHeatingDemand: 0, specificCoolingDemand: 0
+    });
+
+    const viewTitle = isTotal ? "월별 데이터 상세 (전체)" : `월별 데이터 상세 (${currentZone?.zoneName || selectedZoneId})`;
+
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+
+            {/* Zone Selector */}
+            <div className="flex justify-end">
+                <Select value={selectedZoneId} onValueChange={setSelectedZoneId}>
+                    <SelectTrigger className="w-[200px] bg-background">
+                        <SelectValue placeholder="결과 범위 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="total">전체 건물 (Total)</SelectItem>
+                        {results.zones.map(z => (
+                            <SelectItem key={z.zoneId} value={z.zoneId}>{z.zoneName}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
             {/* 요약 카드 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">단위 난방 소요량</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {results.yearly.specificHeatingDemand.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">kWh/m²a</span>
+                            {yearlyData.specificHeatingDemand.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">kWh/m²a</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -98,24 +130,34 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {results.yearly.heatingDemand.toFixed(0)} <span className="text-sm font-normal text-muted-foreground">kWh/a</span>
+                            {yearlyData.heatingDemand.toFixed(0)} <span className="text-sm font-normal text-muted-foreground">kWh/a</span>
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">연면적</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">단위 냉방 소요량</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {results.yearly.totalArea.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">m²</span>
+                            {yearlyData.specificCoolingDemand.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">kWh/m²a</span>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">총 냉방 소요량</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                            {yearlyData.coolingDemand.toFixed(0)} <span className="text-sm font-normal text-muted-foreground">kWh/a</span>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Warnings Alert */}
-            {results.monthly.some(m => m.warnings && m.warnings.length > 0) && (
+            {/* Warnings Alert - Show only if relevant to current view */}
+            {monthlyData.some(m => m.warnings && m.warnings.length > 0) && (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
                     <div className="flex">
                         <div className="flex-shrink-0">
@@ -128,7 +170,7 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                             <div className="mt-2 text-sm text-yellow-700">
                                 <p>다음 존에서 필요한 환기량을 충족하지 못하고 있습니다. (창문 또는 공조 설비 확인 필요)</p>
                                 <ul className="list-disc pl-5 mt-1 space-y-1">
-                                    {Array.from(new Set(results.monthly.flatMap(m => m.warnings || []))).map((w, i) => (
+                                    {Array.from(new Set(monthlyData.flatMap(m => m.warnings || []))).map((w, i) => (
                                         <li key={i}>{w}</li>
                                     ))}
                                 </ul>
@@ -140,37 +182,58 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
 
             {/* 차트 영역 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <MonthlyDemandChart data={results.monthly} />
-                <EnergyBalanceChart data={results.monthly} />
+                <MonthlyDemandChart data={monthlyData} totalArea={yearlyData.totalArea} />
+                <EnergyBalanceChart data={monthlyData} totalArea={yearlyData.totalArea} />
             </div>
 
             {/* 월별 데이터 테이블 */}
             <Card>
                 <CardHeader>
-                    <CardTitle>월별 데이터 상세</CardTitle>
+                    <CardTitle>
+                        {viewTitle}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
+                    <div className="flex justify-end mb-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-3">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-600"></span>손실 (Loss)</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-600"></span>획득 (Gain)</span>
+                        </span>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
                                 <tr>
                                     <th className="px-4 py-2">월</th>
                                     <th className="px-4 py-2">외기온도 (°C)</th>
-                                    <th className="px-4 py-2">손실합계 (kWh)</th>
-                                    <th className="px-4 py-2">획득합계 (kWh)</th>
-                                    <th className="px-4 py-2">난방요구량 (kWh)</th>
+                                    <th className="px-4 py-2">사용일 온도 (°C)</th>
+                                    <th className="px-4 py-2">승온/저감 온도 (°C)</th>
+                                    <th className="px-4 py-2">전도열 (kWh/m²)</th>
+                                    <th className="px-4 py-2">환기열 (kWh/m²)</th>
+                                    <th className="px-4 py-2">태양열획득 (kWh/m²)</th>
+                                    <th className="px-4 py-2">내부발열 (kWh/m²)</th>
+                                    <th className="px-4 py-2 text-red-600">난방요구량 (kWh/m²)</th>
+                                    <th className="px-4 py-2 text-blue-600">냉방요구량 (kWh/m²)</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {results.monthly.map((m) => (
-                                    <tr key={m.month} className="border-b">
-                                        <td className="px-4 py-2 font-medium">{m.month}월</td>
-                                        <td className="px-4 py-2">-</td>
-                                        <td className="px-4 py-2 text-red-500">{m.Qloss.toFixed(0)}</td>
-                                        <td className="px-4 py-2 text-blue-500">{m.Qgain.toFixed(0)}</td>
-                                        <td className="px-4 py-2 font-bold">{m.Qh.toFixed(0)}</td>
-                                    </tr>
-                                ))}
+                                {monthlyData.map((m: any) => {
+                                    const area = yearlyData.totalArea > 0 ? yearlyData.totalArea : 1;
+                                    return (
+                                        <tr key={m.month} className="border-b">
+                                            <td className="px-4 py-2 font-medium">{m.month}월</td>
+                                            <td className="px-4 py-2">{m.outdoorTemp?.toFixed(1) ?? "-"}</td>
+                                            <td className="px-4 py-2">{m.indoorTempUsage?.toFixed(1) ?? "-"}</td>
+                                            <td className="px-4 py-2 text-gray-500">{m.indoorTempNonUsage?.toFixed(1) ?? "-"}</td>
+                                            <td className={`px-4 py-2 ${m.QT > 0 ? "text-blue-600" : "text-red-600"}`}>{(Math.abs(m.QT) / area).toFixed(1)}</td>
+                                            <td className={`px-4 py-2 ${m.QV > 0 ? "text-blue-600" : "text-red-600"}`}>{(Math.abs(m.QV) / area).toFixed(1)}</td>
+                                            <td className="px-4 py-2 text-red-600">{(m.QS / area).toFixed(1)}</td>
+                                            <td className="px-4 py-2 text-red-600">{(m.QI / area).toFixed(1)}</td>
+                                            <td className="px-4 py-2 font-bold text-red-700">{(m.Qh / area).toFixed(1)}</td>
+                                            <td className="px-4 py-2 font-bold text-blue-700">{(m.Qc / area).toFixed(1)}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

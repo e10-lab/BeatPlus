@@ -42,6 +42,11 @@ const formSchema = z.object({
     uValue: z.coerce.number().min(0.01, "열관류율은 0보다 커야 합니다."),
     orientation: z.enum(["N", "NE", "E", "SE", "S", "SW", "W", "NW", "Horiz", "NoExposure"]).optional(),
     tilt: z.coerce.number().min(0).max(180).optional(),
+    shading: z.object({
+        hasDevice: z.boolean(),
+        type: z.enum(["internal", "external", "intermediate"]).optional(),
+        fcValue: z.coerce.number().min(0).max(1).optional(),
+    }).optional(),
 });
 
 type SurfaceFormValues = z.infer<typeof formSchema>;
@@ -69,9 +74,17 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, c
             area: surface?.area || 0,
             uValue: surface?.uValue || 0.20,
             orientation: (surface?.orientation as any) || "S",
+
             tilt: surface?.tilt !== undefined ? surface.tilt : 90,
+            shading: {
+                hasDevice: surface?.shading?.hasDevice || false,
+                type: surface?.shading?.type || "external",
+                fcValue: surface?.shading?.fcValue || 0.25,
+            }
         },
     });
+
+    const hasShading = form.watch("shading.hasDevice");
 
     // Watch type to conditionally show fields
     const currentType = form.watch("type");
@@ -159,6 +172,17 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, c
             if (isExterior || values.type === 'roof_exterior') {
                 surfaceData.orientation = values.orientation as Orientation;
                 surfaceData.tilt = values.tilt;
+            }
+
+            if (values.type === 'window' && values.shading?.hasDevice) {
+                surfaceData.shading = {
+                    hasDevice: true,
+                    type: values.shading.type,
+                    fcValue: values.shading.fcValue || 0.25,
+                    operationMode: "manual" // Default for now
+                };
+            } else if (values.type === 'window') {
+                surfaceData.shading = { hasDevice: false, fcValue: 1.0 };
             }
 
             if (surface && surface.id) {
@@ -359,10 +383,18 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, c
                                             </FormControl>
                                             <SelectContent>
                                                 {currentCategory === "roof" ? (
+                                                    /* Roof also uses standard directions now, but default is Horiz */
                                                     <>
-                                                        <SelectItem value="roof_exterior">지붕 (외기 면함)</SelectItem>
-                                                        <SelectItem value="roof_interior">지붕/천장 (간접 면함)</SelectItem>
-                                                        <SelectItem value="roof_ground">지붕 (지중)</SelectItem>
+                                                        <SelectItem value="S">남 (South)</SelectItem>
+                                                        <SelectItem value="SE">남동 (South-East)</SelectItem>
+                                                        <SelectItem value="E">동 (East)</SelectItem>
+                                                        <SelectItem value="NE">북동 (North-East)</SelectItem>
+                                                        <SelectItem value="N">북 (North)</SelectItem>
+                                                        <SelectItem value="NW">북서 (North-West)</SelectItem>
+                                                        <SelectItem value="W">서 (West)</SelectItem>
+                                                        <SelectItem value="SW">남서 (South-West)</SelectItem>
+                                                        <SelectItem value="Horiz">수평 (Horizontal)</SelectItem>
+                                                        <SelectItem value="NoExposure">일사없음 (No Exposure)</SelectItem>
                                                     </>
                                                 ) : (
                                                     <>
@@ -413,6 +445,104 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, c
                                     </FormItem>
                                 )}
                             />
+                        </div>
+                    )}
+
+                    {/* Shading Section for Windows */}
+                    {currentType === 'window' && (
+                        <div className="space-y-4 border-t pt-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="font-medium text-sm">차양 장치 (Solar Protection)</h4>
+                                <FormField
+                                    control={form.control}
+                                    name="shading.hasDevice"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                            <FormControl>
+                                                {/* Using a native checkbox or Switch if available, sticking to native for simplicity or customized Switch */}
+                                                <input
+                                                    type="checkbox"
+                                                    checked={field.value}
+                                                    onChange={field.onChange}
+                                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                />
+                                            </FormControl>
+                                            <FormLabel className="text-sm font-normal cursor-pointer">
+                                                차양 장치 설치
+                                            </FormLabel>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            {hasShading && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/40 rounded-md">
+                                    <FormField
+                                        control={form.control}
+                                        name="shading.type"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>설치 위치</FormLabel>
+                                                <Select
+                                                    onValueChange={(val) => {
+                                                        field.onChange(val);
+                                                        // Update default FC value based on type
+                                                        if (val === 'external') form.setValue("shading.fcValue", 0.25);
+                                                        if (val === 'internal') form.setValue("shading.fcValue", 0.50);
+                                                        if (val === 'intermediate') form.setValue("shading.fcValue", 0.60);
+                                                    }}
+                                                    value={field.value || "external"}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="위치 선택" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="external">외부 (External)</SelectItem>
+                                                        <SelectItem value="internal">내부 (Internal)</SelectItem>
+                                                        <SelectItem value="intermediate">유리 사이 (Intermediate)</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="shading.fcValue"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <div className="flex items-center gap-1">
+                                                    <FormLabel>감소 계수 (Fc)</FormLabel>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>낮을수록 차단 효과 큼 (0.0~1.0)</p>
+                                                                <p>외부 블라인드: ~0.25</p>
+                                                                <p>내부 커튼: ~0.50</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </div>
+                                                <FormControl>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        max="1"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
 

@@ -13,38 +13,85 @@ export interface MonthlyClimate {
     // DIN 18599는 일반적으로 월평균 값을 사용함
 }
 
+export interface YearlyResult {
+    heatingDemand: number;
+    coolingDemand: number;
+    totalArea: number;
+    specificHeatingDemand: number;
+    specificCoolingDemand: number;
+}
+
+export interface ZoneResult {
+    zoneId: string;
+    zoneName: string;
+    monthly: MonthlyResult[];
+    yearly: YearlyResult;
+}
+
 export interface CalculationResults {
     monthly: MonthlyResult[];
-    yearly: {
-        heatingDemand: number; // kWh/a
-        coolingDemand: number; // kWh/a
-        totalArea: number; // m²
-        specificHeatingDemand: number; // kWh/m²a
-        specificCoolingDemand: number; // kWh/m²a
-    };
-    warnings?: string[];
+    yearly: YearlyResult;
+    zones: ZoneResult[];
 }
 
 export interface MonthlyResult {
     month: number;
-    // 열 손실 (Heat Losses)
-    QT: number; // 전열 손실 (kWh)
-    QV: number; // 환기 손실 (kWh)
-    Qloss: number; // 총 열손실 (kWh)
-
-    // 열 획득 (Heat Gains)
-    QS: number; // 일사 획득 (kWh)
-    QI: number; // 내부 발열 획득 (kWh)
-    Qgain: number; // 총 열획득 (kWh)
-
-    // 효율 및 비율 (Ratios)
-    gamma: number; // 획득/손실 비 (Gain/Loss ratio)
-    eta: number; // 이용 효율 (Utilization factor)
-
-    // 최종 요구량 (Final Demand)
-    Qh: number; // 난방 에너지 요구량 (kWh)
-    Qc: number; // 냉방 에너지 요구량 (kWh)
+    // 난방 관련
+    QT: number; // 전도 열손실
+    QV: number; // 환기 열손실
+    Qloss: number; // 총 열손실
+    QS: number; // 태양열 획득
+    QI: number; // 내부 발열
+    Qgain: number; // 총 열획득
+    gamma: number; // 획득/손실 비
+    eta: number;   // 이용 계수
+    Qh: number;    // 난방 소요량
+    // 냉방 관련
+    Qc: number;    // 냉방 소요량
+    // 진단용
     warnings?: string[];
+    // UI 표시용 추가 정보
+    outdoorTemp?: number;
+    indoorTemp?: number;          // 전체 가중 평균 (기존)
+    indoorTempUsage?: number;     // 사용일 평균 (주간+야간)
+    indoorTempNonUsage?: number;  // 비사용일 평균
+    // 디버깅용 상세 데이터
+    conductionDetails?: ConductionDetails;
+    balanceDetails?: BalanceDetails;
+}
+
+export interface BalanceDetails {
+    tau: number;    // 시상수
+    Cm: number;     // 유효 열용량
+    Htr: number;    // 전열 손실 계수
+    Hve: number;    // 환기 손실 계수
+    Htotal: number; // 총 열손실 계수
+    alpha: number;  // 수치적 매개변수 a
+    gamma: number;  // 이득/손실 비
+    eta: number;    // 이용 효율
+    Ti_set: number; // 난방 설정값
+    Ti_we: number;  // 비사용일 설정값
+    Ti_c: number;   // 냉방 설정값
+    Ti_calc: number;// 계산된 월평균 실내온도
+    // Setback / Reduced Operation Details
+    f_NA: number;   // 야간 축소 운전 보정 계수
+    f_we: number;   // 비사용일 축소 운전 보정 계수
+    t_NA: number;   // 축소 운전 시간 (h)
+    f_adapt: number; // 적응형 운전 계수
+    delta_theta_i_NA: number; // 허용 온도 저감폭
+    delta_theta_EMS: number; // EMS 보정 온도
+
+}
+
+export interface ConductionDetails {
+    H_D: number;    // Direct (Ext)
+    H_g: number;    // Ground
+    H_U: number;    // Unheated
+    H_A: number;    // Adjacent
+    H_TB: number;   // Thermal Bridge
+    H_tr: number;   // Total
+    Area_envelope: number;
+    Delta_U_wb: number;
 }
 
 export interface ClimateData {

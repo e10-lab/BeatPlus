@@ -22,8 +22,9 @@ import { Surface } from "@/types/project";
 import { GeometricAnalysis } from "./geometric-analysis";
 import { createZone, updateZone } from "@/services/zone-service";
 import { useState, useEffect } from "react";
-import { Loader2, Info, Clock, Lightbulb, Thermometer, Wind, Fan, Zap } from "lucide-react";
+import { Loader2, Info, Clock, Lightbulb, Thermometer, Wind, Fan, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { DIN_18599_PROFILES, PROFILE_OPTIONS } from "@/lib/din-18599-profiles";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Dialog,
     DialogContent,
@@ -66,6 +67,7 @@ const formSchema = z.object({
     ventilationMode: z.enum(["natural", "mechanical", "balanced_mech"]).optional(),
     lightingPowerDensity: z.number().optional(),
     lightingEfficacy: z.number().optional(),
+    heatingReducedMode: z.enum(["setback", "shutdown"]).default("setback"),
     // UI 로직을 위해 추가됨
     isMechanical: z.boolean().optional(),
 });
@@ -84,9 +86,10 @@ interface ZoneFormProps {
         n50: number;
     };
     units?: VentilationUnit[];
+    renderEnvelope?: () => React.ReactNode;
 }
 
-export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, projectVentilation, units = [] }: ZoneFormProps) {
+export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, projectVentilation, units = [], renderEnvelope }: ZoneFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -104,6 +107,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
             ventilationMode: zone?.ventilationMode || "natural",
             lightingPowerDensity: zone?.lighting?.powerDensity,
             lightingEfficacy: zone?.lighting?.efficacy ?? 60,
+            heatingReducedMode: zone?.heatingReducedMode || "setback",
             isMechanical: (zone?.linkedVentilationUnitIds || []).length > 0,
         },
     });
@@ -125,6 +129,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 lightingPowerDensity: zone.lighting?.powerDensity || undefined,
                 linkedVentilationUnitIds: zone.linkedVentilationUnitIds || [],
                 ventilationMode: zone.ventilationMode || "natural",
+                heatingReducedMode: zone.heatingReducedMode || "setback",
                 isMechanical: zone.ventilationMode !== "natural",
             });
         } else {
@@ -140,6 +145,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 lightingPowerDensity: undefined,
                 linkedVentilationUnitIds: [],
                 ventilationMode: "natural",
+                heatingReducedMode: "setback",
                 isMechanical: false,
             });
         }
@@ -170,6 +176,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 },
                 linkedVentilationUnitIds: values.linkedVentilationUnitIds || [],
                 ventilationMode: ((values.linkedVentilationUnitIds && values.linkedVentilationUnitIds.length > 0) ? "mechanical" : "natural") as "natural" | "mechanical" | "balanced_mech",
+                heatingReducedMode: values.heatingReducedMode,
             };
 
             if (zone && zone.id) {
@@ -189,162 +196,195 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 border p-4 rounded-lg bg-card text-card-foreground shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>존 이름</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="예: 1층 사무실" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <div className="space-y-2">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 border border-transparent p-1 rounded-lg">
+                {/* 1. Basic Info Section */}
+                <div className="space-y-4 border p-4 rounded-lg bg-card text-card-foreground shadow-sm">
+                    <h2 className="text-lg font-semibold">기본 정보</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
-                            name="usageType"
+                            name="name"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="flex items-center gap-2">
-                                        용도 프로필 (DIN V 18599-10)
-                                        {selectedProfile && (
-                                            <Dialog>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary">
-                                                        <Info className="h-4 w-4" />
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                                                    <DialogHeader>
-                                                        <DialogTitle className="flex items-center gap-2 text-xl">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-                                                            프로필 상세 정보: {selectedProfile.name}
-                                                        </DialogTitle>
-                                                        <DialogDescription>
-                                                            DIN V 18599-10 표준에 따른 해당 용도의 표준 설정값입니다.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
+                                    <FormLabel>존 이름</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="예: 1층 사무실" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <div className="space-y-2">
+                            <FormField
+                                control={form.control}
+                                name="usageType"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            용도 프로필 (DIN V 18599-10)
+                                            {selectedProfile && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary">
+                                                            <Info className="h-4 w-4" />
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                                                        <DialogHeader>
+                                                            <DialogTitle className="flex items-center gap-2 text-xl">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                                                                프로필 상세 정보: {selectedProfile.name}
+                                                            </DialogTitle>
+                                                            <DialogDescription>
+                                                                DIN V 18599-10 표준에 따른 해당 용도의 표준 설정값입니다.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
 
-                                                    <div className="grid grid-cols-1 gap-6 mt-4">
-                                                        <Card>
-                                                            <CardHeader className="pb-2 bg-muted/40">
-                                                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                                                    <Clock className="h-4 w-4" /> 1. 이용 및 운영 시간
-                                                                </CardTitle>
-                                                            </CardHeader>
-                                                            <CardContent className="text-sm pt-4 space-y-2">
-                                                                <div className="flex justify-between"><span>일일 이용 시간</span> <span className="font-mono">{selectedProfile.dailyUsageHours} h</span></div>
-                                                                <div className="flex justify-between"><span>연간 이용 일수</span> <span className="font-mono">{selectedProfile.annualUsageDays} d</span></div>
-                                                                <div className="border-t my-2" />
-                                                                <div className="flex justify-between text-muted-foreground mr-1"><span>주간 연간 이용시간 (07-18)</span> <span className="font-mono">{selectedProfile.usageHoursDay} h</span></div>
-                                                                <div className="flex justify-between text-muted-foreground mr-1"><span>야간 연간 이용시간 (18-07)</span> <span className="font-mono">{selectedProfile.usageHoursNight} h</span></div>
-                                                                <div className="flex justify-between text-muted-foreground"><span>시간대</span> <span className="font-mono">{selectedProfile.usageHoursStart}:00 - {selectedProfile.usageHoursEnd}:00</span></div>
-                                                                <div className="border-t my-2" />
-                                                                <div className="flex justify-between"><span>공조 일일 운전</span> <span className="font-mono">{selectedProfile.hvacDailyOperationHours} h</span></div>
-                                                                <div className="flex justify-between"><span>공조 연간 운전</span> <span className="font-mono">{selectedProfile.hvacAnnualOperationDays} d</span></div>
-                                                            </CardContent>
-                                                        </Card>
-                                                        <Card>
-                                                            <CardHeader className="pb-2 bg-muted/40">
-                                                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                                                    <Lightbulb className="h-4 w-4" /> 2. 조명
-                                                                </CardTitle>
-                                                            </CardHeader>
-                                                            <CardContent className="text-sm pt-4 space-y-2">
-                                                                <div className="flex justify-between"><span>조도 유지값 (Em)</span> <span className="font-mono">{selectedProfile.illuminance} lx</span></div>
-                                                                <div className="flex justify-between"><span>작업면 높이</span> <span className="font-mono">{selectedProfile.workplaneHeight} m</span></div>
-                                                                <div className="flex justify-between"><span>조도 감소 계수 (kL)</span> <span className="font-mono">{selectedProfile.illuminanceDepreciationFactor}</span></div>
-                                                                <div className="flex justify-between"><span>상대적 부재율 (FA)</span> <span className="font-mono">{selectedProfile.lightingAbsenceFactor}</span></div>
-                                                                <div className="flex justify-between"><span>부분 가동 계수 (FTe)</span> <span className="font-mono">{selectedProfile.partialOperationFactorLighting}</span></div>
-                                                                <div className="border-t my-2" />
-                                                                <div className="flex justify-between text-muted-foreground mr-1"><span>기본 광효율 (가정)</span> <span className="font-mono">60 lm/W</span></div>
-                                                                <div className="flex justify-between font-medium"><span>추정 전력 밀도</span> <span className="font-mono">{(selectedProfile.illuminance / 60).toFixed(1)} W/m²</span></div>
-                                                            </CardContent>
-                                                        </Card>
-                                                        <Card>
-                                                            <CardHeader className="pb-2 bg-muted/40">
-                                                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                                                    <Thermometer className="h-4 w-4" /> 3. 실내 온도
-                                                                </CardTitle>
-                                                            </CardHeader>
-                                                            <CardContent className="text-sm pt-4 space-y-2">
-                                                                <div className="flex justify-between font-medium"><span>난방 설정온도</span> <span className="font-mono text-red-500">{selectedProfile.heatingSetpoint} °C</span></div>
-                                                                <div className="flex justify-between font-medium"><span>냉방 설정온도</span> <span className="font-mono text-blue-500">{selectedProfile.coolingSetpoint} °C</span></div>
-                                                                <div className="border-t my-2" />
-                                                                <div className="flex justify-between"><span>절감운전 (난방)</span> <span className="font-mono">{selectedProfile.heatingSetbackTemp} °C</span></div>
-                                                                <div className="flex justify-between"><span>설계 최소 (난방)</span> <span className="font-mono">{selectedProfile.heatingDesignMinTemp} °C</span></div>
-                                                                <div className="flex justify-between"><span>설계 최대 (냉방)</span> <span className="font-mono">{selectedProfile.coolingDesignMaxTemp} °C</span></div>
-                                                            </CardContent>
-                                                        </Card>
-                                                        <Card>
-                                                            <CardHeader className="pb-2 bg-muted/40">
-                                                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                                                    <Wind className="h-4 w-4" /> 4. 실내 기후
-                                                                </CardTitle>
-                                                            </CardHeader>
-                                                            <CardContent className="text-sm pt-4 space-y-2">
-                                                                <div className="flex justify-between"><span>습도 요구사항</span> <span className="font-mono">{selectedProfile.humidityRequirement}</span></div>
-                                                                <div className="flex justify-between"><span>최소 외기 도입량</span> <span className="font-mono">{selectedProfile.minOutdoorAir} m³/(h·m²)</span></div>
-                                                                <div className="flex justify-between"><span>최소 외기 체적 유량</span> <span className="font-mono">{selectedProfile.minOutdoorAirFlow} m³/(h·m²)</span></div>
-                                                            </CardContent>
-                                                        </Card>
-                                                        <Card>
-                                                            <CardHeader className="pb-2 bg-muted/40">
-                                                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                                                    <Fan className="h-4 w-4" /> 5. 공조 시스템
-                                                                </CardTitle>
-                                                            </CardHeader>
-                                                            <CardContent className="text-sm pt-4 space-y-2">
-                                                                <div className="flex justify-between"><span>상대적 부재율 (FA,RLT)</span> <span className="font-mono">{selectedProfile.hvacAbsenceFactor}</span></div>
-                                                                <div className="flex justify-between"><span>부분 가동 계수 (FTe,RLT)</span> <span className="font-mono">{selectedProfile.hvacPartialOperationFactor}</span></div>
-                                                            </CardContent>
-                                                        </Card>
-                                                        <Card>
-                                                            <CardHeader className="pb-2 bg-muted/40">
-                                                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                                                    <Zap className="h-4 w-4" /> 6. 내부 열획득
-                                                                </CardTitle>
-                                                            </CardHeader>
-                                                            <CardContent className="text-sm pt-4 space-y-2">
-                                                                <div className="flex justify-between"><span>인체 발열 (Qp)</span> <span className="font-mono">{selectedProfile.metabolicHeat} Wh/(m²·d)</span></div>
-                                                                <div className="flex justify-between"><span>기기 발열 (Qg)</span> <span className="font-mono">{selectedProfile.equipmentHeat} Wh/(m²·d)</span></div>
-                                                            </CardContent>
-                                                        </Card>
-                                                    </div>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                    </FormLabel>
-                                    <Select
-                                        onValueChange={(val) => {
-                                            field.onChange(val);
-                                            // 값 자동 업데이트
-                                            const p = DIN_18599_PROFILES[val];
-                                            if (p) {
-                                                form.setValue("heatingTemp", p.heatingSetpoint);
-                                                form.setValue("coolingTemp", p.coolingSetpoint);
-                                            }
-                                        }}
-                                        defaultValue={field.value}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="용도 선택" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent className="max-h-[300px]">
-                                            {PROFILE_OPTIONS.map((profile) => (
-                                                <SelectItem key={profile.id} value={profile.id}>
-                                                    {profile.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                                        <div className="grid grid-cols-1 gap-6 mt-4">
+                                                            <Card>
+                                                                <CardHeader className="pb-2 bg-muted/40">
+                                                                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                                                        <Clock className="h-4 w-4" /> 1. 이용 및 운영 시간
+                                                                    </CardTitle>
+                                                                </CardHeader>
+                                                                <CardContent className="text-sm pt-4 space-y-2">
+                                                                    <div className="flex justify-between"><span>일일 이용 시간</span> <span className="font-mono">{selectedProfile.dailyUsageHours} h</span></div>
+                                                                    <div className="flex justify-between"><span>연간 이용 일수</span> <span className="font-mono">{selectedProfile.annualUsageDays} d</span></div>
+                                                                    <div className="border-t my-2" />
+                                                                    <div className="flex justify-between text-muted-foreground mr-1"><span>주간 연간 이용시간 (07-18)</span> <span className="font-mono">{selectedProfile.usageHoursDay} h</span></div>
+                                                                    <div className="flex justify-between text-muted-foreground mr-1"><span>야간 연간 이용시간 (18-07)</span> <span className="font-mono">{selectedProfile.usageHoursNight} h</span></div>
+                                                                    <div className="flex justify-between text-muted-foreground"><span>시간대</span> <span className="font-mono">{selectedProfile.usageHoursStart}:00 - {selectedProfile.usageHoursEnd}:00</span></div>
+                                                                    <div className="border-t my-2" />
+                                                                    <div className="flex justify-between"><span>공조 일일 운전</span> <span className="font-mono">{selectedProfile.hvacDailyOperationHours} h</span></div>
+                                                                    <div className="flex justify-between"><span>공조 연간 운전</span> <span className="font-mono">{selectedProfile.hvacAnnualOperationDays} d</span></div>
+                                                                </CardContent>
+                                                            </Card>
+                                                            <Card>
+                                                                <CardHeader className="pb-2 bg-muted/40">
+                                                                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                                                        <Lightbulb className="h-4 w-4" /> 2. 조명
+                                                                    </CardTitle>
+                                                                </CardHeader>
+                                                                <CardContent className="text-sm pt-4 space-y-2">
+                                                                    <div className="flex justify-between"><span>조도 유지값 (Em)</span> <span className="font-mono">{selectedProfile.illuminance} lx</span></div>
+                                                                    <div className="flex justify-between"><span>작업면 높이</span> <span className="font-mono">{selectedProfile.workplaneHeight} m</span></div>
+                                                                    <div className="flex justify-between"><span>조도 감소 계수 (kL)</span> <span className="font-mono">{selectedProfile.illuminanceDepreciationFactor}</span></div>
+                                                                    <div className="flex justify-between"><span>상대적 부재율 (FA)</span> <span className="font-mono">{selectedProfile.lightingAbsenceFactor}</span></div>
+                                                                    <div className="flex justify-between"><span>부분 가동 계수 (FTe)</span> <span className="font-mono">{selectedProfile.partialOperationFactorLighting}</span></div>
+                                                                    <div className="border-t my-2" />
+                                                                    <div className="flex justify-between text-muted-foreground mr-1"><span>기본 광효율 (가정)</span> <span className="font-mono">60 lm/W</span></div>
+                                                                    <div className="flex justify-between font-medium"><span>추정 전력 밀도</span> <span className="font-mono">{(selectedProfile.illuminance / 60).toFixed(1)} W/m²</span></div>
+                                                                </CardContent>
+                                                            </Card>
+                                                            <Card>
+                                                                <CardHeader className="pb-2 bg-muted/40">
+                                                                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                                                        <Thermometer className="h-4 w-4" /> 3. 실내 온도
+                                                                    </CardTitle>
+                                                                </CardHeader>
+                                                                <CardContent className="text-sm pt-4 space-y-2">
+                                                                    <div className="flex justify-between font-medium"><span>난방 설정온도</span> <span className="font-mono text-red-500">{selectedProfile.heatingSetpoint} °C</span></div>
+                                                                    <div className="flex justify-between font-medium"><span>냉방 설정온도</span> <span className="font-mono text-blue-500">{selectedProfile.coolingSetpoint} °C</span></div>
+                                                                    <div className="border-t my-2" />
+                                                                    <div className="flex justify-between"><span>절감운전 (난방)</span> <span className="font-mono">{selectedProfile.heatingSetbackTemp} °C</span></div>
+                                                                    <div className="flex justify-between"><span>설계 최소 (난방)</span> <span className="font-mono">{selectedProfile.heatingDesignMinTemp} °C</span></div>
+                                                                    <div className="flex justify-between"><span>설계 최대 (냉방)</span> <span className="font-mono">{selectedProfile.coolingDesignMaxTemp} °C</span></div>
+                                                                </CardContent>
+                                                            </Card>
+                                                            <Card>
+                                                                <CardHeader className="pb-2 bg-muted/40">
+                                                                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                                                        <Wind className="h-4 w-4" /> 4. 실내 기후
+                                                                    </CardTitle>
+                                                                </CardHeader>
+                                                                <CardContent className="text-sm pt-4 space-y-2">
+                                                                    <div className="flex justify-between"><span>습도 요구사항</span> <span className="font-mono">{selectedProfile.humidityRequirement}</span></div>
+                                                                    <div className="flex justify-between"><span>최소 외기 도입량</span> <span className="font-mono">{selectedProfile.minOutdoorAir} m³/(h·m²)</span></div>
+                                                                    <div className="flex justify-between"><span>최소 외기 체적 유량</span> <span className="font-mono">{selectedProfile.minOutdoorAirFlow} m³/(h·m²)</span></div>
+                                                                </CardContent>
+                                                            </Card>
+                                                            <Card>
+                                                                <CardHeader className="pb-2 bg-muted/40">
+                                                                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                                                        <Fan className="h-4 w-4" /> 5. 공조 시스템
+                                                                    </CardTitle>
+                                                                </CardHeader>
+                                                                <CardContent className="text-sm pt-4 space-y-2">
+                                                                    <div className="flex justify-between"><span>상대적 부재율 (FA,RLT)</span> <span className="font-mono">{selectedProfile.hvacAbsenceFactor}</span></div>
+                                                                    <div className="flex justify-between"><span>부분 가동 계수 (FTe,RLT)</span> <span className="font-mono">{selectedProfile.hvacPartialOperationFactor}</span></div>
+                                                                </CardContent>
+                                                            </Card>
+                                                            <Card>
+                                                                <CardHeader className="pb-2 bg-muted/40">
+                                                                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                                                        <Zap className="h-4 w-4" /> 6. 내부 열획득
+                                                                    </CardTitle>
+                                                                </CardHeader>
+                                                                <CardContent className="text-sm pt-4 space-y-2">
+                                                                    <div className="flex justify-between"><span>인체 발열 (Qp)</span> <span className="font-mono">{selectedProfile.metabolicHeat} Wh/(m²·d)</span></div>
+                                                                    <div className="flex justify-between"><span>기기 발열 (Qg)</span> <span className="font-mono">{selectedProfile.equipmentHeat} Wh/(m²·d)</span></div>
+                                                                </CardContent>
+                                                            </Card>
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </FormLabel>
+                                        <Select
+                                            onValueChange={(val) => {
+                                                field.onChange(val);
+                                                // 값 자동 업데이트
+                                                const p = DIN_18599_PROFILES[val];
+                                                if (p) {
+                                                    form.setValue("heatingTemp", p.heatingSetpoint);
+                                                    form.setValue("coolingTemp", p.coolingSetpoint);
+                                                }
+                                            }}
+                                            defaultValue={field.value}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="용도 선택" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="max-h-[300px]">
+                                                {PROFILE_OPTIONS.map((profile) => (
+                                                    <SelectItem key={profile.id} value={profile.id}>
+                                                        {profile.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="area"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>바닥 면적 (m²)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" step="0.01" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="height"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>천정고 (m)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" step="0.1" {...field} />
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -352,42 +392,96 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="area"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>바닥 면적 (m²)</FormLabel>
-                                <FormControl>
-                                    <Input type="number" step="0.01" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="height"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>천정고 (m)</FormLabel>
-                                <FormControl>
-                                    <Input type="number" step="0.1" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                {/* 1.1 Temperature & Operation Mode Section */}
+                <div className="space-y-4 border p-4 rounded-lg bg-card text-card-foreground shadow-sm">
+                    <h2 className="text-lg font-semibold">난방/냉방 설정</h2>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="heatingTemp"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>난방 설정 온도 (°C)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" step="0.5" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="coolingTemp"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>냉방 설정 온도 (°C)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" step="0.5" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1">
+                            <FormField
+                                control={form.control}
+                                name="heatingReducedMode"
+                                render={({ field }) => (
+                                    <FormItem className="space-y-3">
+                                        <FormLabel className="flex items-center gap-2">
+                                            비사용 시간 난방 모드
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Info className="h-4 w-4 text-muted-foreground" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs">
+                                                        <p>야간 또는 주말 등 비사용 시간의 난방 운전 방식을 선택합니다.</p>
+                                                        <p className="mt-1"><b>저감 운전:</b> 온도를 낮추어 유지 (DIN 18599 식 28, 31)</p>
+                                                        <p><b>난방 정지:</b> 난방을 완전히 정지 (DIN 18599 식 29, 32)</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Tabs
+                                                defaultValue={field.value}
+                                                onValueChange={field.onChange}
+                                                className="w-full"
+                                            >
+                                                <TabsList className="grid w-full grid-cols-2">
+                                                    <TabsTrigger value="setback">저감 운전</TabsTrigger>
+                                                    <TabsTrigger value="shutdown">난방 정지</TabsTrigger>
+                                                </TabsList>
+                                            </Tabs>
+                                        </FormControl>
+                                        <FormDescription>
+                                            건물 시상수에 따른 온도 저감 보정 계수가 달라집니다.
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                {/* Ventilation Settings */}
-                <div className="space-y-4 border rounded-md p-4 bg-muted/20">
-                    <h3 className="font-medium flex items-center gap-2">
-                        <Fan className="h-4 w-4" />
-                        환기 설정 (Ventilation)
-                    </h3>
+                {/* 2. Envelope Configuration (Rendered externally if provided and zone exists) */}
+                {renderEnvelope && zone && (
+                    <div className="space-y-4">
+                        {renderEnvelope()}
+                    </div>
+                )}
 
+                {/* 3. Ventilation Settings */}
+                <CollapsibleSection
+                    title="환기 설정 (Ventilation)"
+                    icon={<Fan className="h-5 w-5" />}
+                    defaultOpen={true}
+                >
                     {/* Ventilation Units Multi-Select */}
                     {units.length > 0 ? (
                         <FormField
@@ -434,16 +528,15 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                             등록된 공조 장비가 없습니다. '설비' 탭에서 먼저 장비를 추가해주세요.
                         </div>
                     )}
-                </div>
+                </CollapsibleSection>
 
 
-
-                {/* Lighting Settings */}
-                <div className="space-y-4 border rounded-md p-4 bg-muted/20">
-                    <h3 className="font-medium flex items-center gap-2">
-                        <Lightbulb className="h-4 w-4" />
-                        조명 설정 (선택사항)
-                    </h3>
+                {/* 4. Lighting Settings */}
+                <CollapsibleSection
+                    title="조명 설정 (선택사항)"
+                    icon={<Lightbulb className="h-5 w-5" />}
+                    defaultOpen={false}
+                >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             control={form.control}
@@ -488,11 +581,11 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                             )}
                         />
                     </div>
-                </div>
+                </CollapsibleSection>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
 
-                <div className="flex justify-end gap-3 pt-4">
+                <div className="flex justify-end gap-3 pt-4 sticky bottom-0 bg-background/80 backdrop-blur-sm p-4 border-t mt-4 z-10">
                     {onCancel && (
                         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
                             취소
@@ -505,5 +598,39 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 </div>
             </form >
         </Form >
+    );
+}
+
+// Internal Helper for Collapsible Sections
+function CollapsibleSection({
+    title,
+    children,
+    defaultOpen = false,
+    icon
+}: {
+    title: string;
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+    icon?: React.ReactNode;
+}) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <Card className="shadow-sm">
+            <CardHeader className="py-4 px-6 flex flex-row items-center justify-between space-y-0 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setIsOpen(!isOpen)}>
+                <div className="flex items-center gap-2 select-none">
+                    {icon}
+                    <CardTitle className="text-base font-semibold">{title}</CardTitle>
+                </div>
+                <div className="flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground">
+                    {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+            </CardHeader>
+            {isOpen && (
+                <CardContent className="pt-0 pb-6 px-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {children}
+                </CardContent>
+            )}
+        </Card>
     );
 }

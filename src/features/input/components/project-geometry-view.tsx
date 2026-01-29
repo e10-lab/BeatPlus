@@ -7,7 +7,7 @@ import { ZoneForm } from "./zone-form";
 import { SurfaceList } from "./surface-list";
 import { SurfaceForm } from "./surface-form";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft } from "lucide-react";
+import { Plus, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Construction } from "@/types/project";
@@ -113,9 +113,17 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                         hasALD: shouldHaveALD,
                         n50: newN50
                     });
-                    // Reload state to reflect changes
-                    const updatedProj = await getProject(projectId);
-                    setProject(updatedProj);
+
+                    // Update state directly to reflect changes immediately
+                    setProject({
+                        ...proj,
+                        ventilationConfig: {
+                            ...proj.ventilationConfig,
+                            type: mode,
+                            hasALD: shouldHaveALD,
+                            n50: newN50
+                        }
+                    });
                 }
             }
 
@@ -194,80 +202,24 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                         projectStats={projectStats}
                         projectVentilation={project?.ventilationConfig}
                         units={project?.ventilationUnits}
-                    />
-                </div >
-
-                {/* Vertical Divider or just spacing - Spacing (space-y-6) handles it */}
-
-                {/* Envelope Configuration - Only visible if zone is saved (has ID) */}
-                {
-                    selectedZone && selectedZone.id && (
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between pb-3">
-                                <div className="space-y-1">
-                                    <CardTitle className="text-base">외피 (Envelope) 구성</CardTitle>
-                                    <CardDescription>이 존을 구성하는 벽체, 창호, 지붕 등을 관리합니다.</CardDescription>
-                                </div>
-                                <Button onClick={handleAddSurface} size="sm" variant="outline">
-                                    <Plus className="mr-2 h-4 w-4" /> 표면 추가
-                                </Button>
-                            </CardHeader>
-
-                            <CardContent className="space-y-4">
-                                {/* Thermal Bridge Setting */}
-                                <div className="flex flex-col gap-2 p-3 border rounded-md bg-muted/20">
-                                    <Label className="text-sm font-medium">열교 (Thermal Bridge)</Label>
-                                    <Select
-                                        value={(selectedZone.thermalBridgeMode || 0.10).toFixed(2)}
-                                        onValueChange={async (val) => {
-                                            const newValue = Number(val);
-                                            if (selectedZone.id) {
-                                                const updated = { ...selectedZone, thermalBridgeMode: newValue };
-                                                setSelectedZone(updated); // Optimistic UI update
-                                                try {
-                                                    await updateZone(projectId, selectedZone.id, { thermalBridgeMode: newValue });
-                                                    handleFormSuccess(updated); // Refresh parent state
-                                                } catch (e) {
-                                                    console.error("Failed to update thermal bridge:", e);
-                                                    // Revert logic if needed, but for now simple log
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-full md:w-[400px] bg-background">
-                                            <SelectValue placeholder="열교 유형 선택" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="0.10">일반적인 경우 (0.10 W/m²K)</SelectItem>
-                                            <SelectItem value="0.05">단열상세 규정 준수 (0.05 W/m²K)</SelectItem>
-                                            <SelectItem value="0.15">내단열인 경우 (0.15 W/m²K)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <p className="text-xs text-muted-foreground">
-                                        선형 열관류율(Ψ)에 대한 보정값입니다. 상세 계산을 하지 않는 경우 선택하세요.
-                                    </p>
-                                </div>
-
-                                <SurfaceList
+                        renderEnvelope={() => (
+                            selectedZone && selectedZone.id ? (
+                                <EnvelopeSection
+                                    selectedZone={selectedZone}
                                     projectId={projectId}
-                                    zoneId={selectedZone.id!}
-                                    onEdit={handleEditSurface}
+                                    handleAddSurface={handleAddSurface}
+                                    handleEditSurface={handleEditSurface}
                                     refreshTrigger={refreshTrigger}
                                     constructions={constructions}
+                                    setSelectedZone={setSelectedZone}
+                                    handleFormSuccess={handleFormSuccess}
                                 />
-                            </CardContent>
-                        </Card>
-                    )
-                }
-            </div >
+                            ) : null
+                        )}
+                    />
+                </div >
+            </div>
         );
-    }
-
-    // zone-detail mode removed - merged into form
-    if (viewMode === "zone-detail") {
-        // Fallback for safety, though should not be reached
-        setViewMode("form");
-        return null;
     }
 
     if (viewMode === "surface-form" && selectedZone) {
@@ -531,5 +483,119 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                 </Card>
             </TabsContent>
         </Tabs >
+    );
+}
+
+// Helper Component for Collapsible Sections
+function CollapsibleSection({
+    title,
+    description,
+    children,
+    defaultOpen = false,
+    headerAction
+}: {
+    title: string;
+    description?: string;
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+    headerAction?: React.ReactNode;
+}) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3 space-y-0 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setIsOpen(!isOpen)}>
+                <div className="space-y-1 select-none">
+                    <CardTitle className="text-base">{title}</CardTitle>
+                    {description && <CardDescription>{description}</CardDescription>}
+                </div>
+                <div className="flex items-center gap-2">
+                    {headerAction}
+                    <div className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-muted transition-colors">
+                        {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
+                </div>
+            </CardHeader>
+            {isOpen && (
+                <CardContent className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {children}
+                </CardContent>
+            )}
+        </Card>
+    );
+}
+
+// Extracted Envelope Section
+function EnvelopeSection({
+    selectedZone,
+    projectId,
+    handleAddSurface,
+    handleEditSurface,
+    refreshTrigger,
+    constructions,
+    setSelectedZone,
+    handleFormSuccess
+}: {
+    selectedZone: Zone;
+    projectId: string;
+    handleAddSurface: () => void;
+    handleEditSurface: (surface: any) => void;
+    refreshTrigger: number;
+    constructions: Construction[];
+    setSelectedZone: (zone: Zone) => void;
+    handleFormSuccess: (zone: Zone) => void;
+}) {
+    return (
+        <CollapsibleSection
+            title="외피 (Envelope) 구성"
+            description="이 존을 구성하는 벽체, 창호, 지붕 등을 관리합니다."
+            defaultOpen={true}
+            headerAction={
+                <Button onClick={(e) => { e.stopPropagation(); handleAddSurface(); }} size="sm" variant="outline" type="button">
+                    <Plus className="mr-2 h-4 w-4" /> 표면 추가
+                </Button>
+            }
+        >
+            {/* Thermal Bridge Setting */}
+            <div className="flex flex-col gap-2 p-3 border rounded-md bg-muted/20">
+                <Label className="text-sm font-medium">열교 (Thermal Bridge)</Label>
+                <Select
+                    value={(selectedZone.thermalBridgeMode || 0.10).toFixed(2)}
+                    onValueChange={async (val) => {
+                        const newValue = Number(val);
+                        if (selectedZone.id) {
+                            const updated = { ...selectedZone, thermalBridgeMode: newValue };
+                            setSelectedZone(updated); // Optimistic UI update
+                            try {
+                                await updateZone(projectId, selectedZone.id, { thermalBridgeMode: newValue });
+                                handleFormSuccess(updated); // Refresh parent state
+                            } catch (e) {
+                                console.error("Failed to update thermal bridge:", e);
+                            }
+                        }
+                    }}
+                >
+                    <SelectTrigger className="w-full md:w-[400px] bg-background">
+                        <SelectValue placeholder="열교 유형 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="0.10">일반적인 경우 (0.10 W/m²K)</SelectItem>
+                        <SelectItem value="0.05">단열상세 규정 준수 (0.05 W/m²K)</SelectItem>
+                        <SelectItem value="0.15">내단열인 경우 (0.15 W/m²K)</SelectItem>
+                    </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                    선형 열관류율(Ψ)에 대한 보정값입니다. 상세 계산을 하지 않는 경우 선택하세요.
+                </p>
+            </div>
+
+            <SurfaceList
+                projectId={projectId}
+                zoneId={selectedZone.id!}
+                onEdit={handleEditSurface}
+                refreshTrigger={refreshTrigger}
+                constructions={constructions}
+            />
+        </CollapsibleSection>
     );
 }

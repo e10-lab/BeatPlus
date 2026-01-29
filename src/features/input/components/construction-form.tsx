@@ -453,8 +453,7 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                                                         // Roof Options
                                                         [
                                                             { label: "금속 (0.2)", value: 0.2 },
-                                                            { label: "적색기와 (0.6)", value: 0.6 },
-                                                            { label: "슁글 (0.6)", value: 0.6 },
+                                                            { label: "적색기와/슁글 (0.6)", value: 0.6 },
                                                             { label: "어두운색 (0.8)", value: 0.8 }
                                                         ].map((opt) => (
                                                             <Button
