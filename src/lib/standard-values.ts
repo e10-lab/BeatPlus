@@ -71,7 +71,7 @@ export function calculateStandardN50(
 ): number {
     if (totalVolume <= 0) return 2.0;
 
-    // DIN V 18599-2:2011-09 Table 6
+    // DIN/TS 18599-2:2011-09 Table 6
     const table6 = {
         "I": {
             small: { natural: 2, mechanical: 1 },  // Ref: Table 6 a) 2, b) 1

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, BarChart3, Building2, Calculator } from "lucide-react";
+import { StartAnalysisButton } from "@/components/start-analysis-button";
 
 export default function Home() {
   return (
@@ -10,21 +11,16 @@ export default function Home() {
 
       <main className="flex-1">
         <section className="py-24 px-4 text-center space-y-8 bg-gradient-to-b from-background to-muted/20">
-          <div className="mx-auto max-w-3xl space-y-4">
+          <div className="mx-auto max-w-6xl space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl text-foreground">
-              건축물 에너지 효율 등급 <br className="hidden sm:inline" />
-              <span className="text-primary">DIN V 18599 해석 툴</span>
+              Next-Gen Building Energy Analysis Tool
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              DIN V 18599 표준에 따른 난방, 냉방 및 환기 에너지 소요량을 웹에서 간편하게 계산하세요.
+              DIN/TS 18599 표준에 따른 난방, 냉방 및 환기 에너지 소요량을 웹에서 간편하게 계산하세요.
             </p>
           </div>
           <div className="flex justify-center gap-4">
-            <Button size="lg" className="h-12 px-8 text-lg" asChild>
-              <Link href="/projects/new">
-                분석 시작하기 <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
+            <StartAnalysisButton />
             <Button size="lg" variant="outline" className="h-12 px-8 text-lg" asChild>
               <Link href="/docs">사용 가이드</Link>
             </Button>
@@ -47,7 +43,7 @@ export default function Home() {
               <CardHeader>
                 <Calculator className="h-10 w-10 text-primary mb-2" />
                 <CardTitle>표준 계산 엔진</CardTitle>
-                <CardDescription>DIN V 18599 Part 2 및 관련 표준을 준수합니다.</CardDescription>
+                <CardDescription>DIN/TS 18599 Part 2 및 관련 표준을 준수합니다.</CardDescription>
               </CardHeader>
               <CardContent>
                 최신 규정에 기반하여 난방 및 냉방 순 에너지 소요량을 정확하게 계산합니다.

@@ -337,15 +337,18 @@ export function ProjectSettingsForm({ project, onUpdate }: ProjectSettingsFormPr
                                     render={({ field }) => (
                                         <FormItem className="flex-[2] space-y-0">
                                             <FormControl>
-                                                <Input readOnly placeholder="주소 검색을 이용하세요" {...field} />
+                                                <Input
+                                                    readOnly
+                                                    placeholder="클릭하여 주소를 검색하세요"
+                                                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                                    onClick={() => setOpenPostcode(true)}
+                                                    {...field}
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
-                                <Button type="button" variant="outline" onClick={() => setOpenPostcode(true)}>
-                                    검색
-                                </Button>
                                 <FormField
                                     control={form.control as any}
                                     name="detailAddress"

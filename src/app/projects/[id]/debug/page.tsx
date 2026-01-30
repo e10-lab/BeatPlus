@@ -10,7 +10,8 @@ import { getProject } from "@/services/project-service";
 import { getZones } from "@/services/zone-service";
 import { getSurfaces } from "@/services/surface-service";
 import { calculateEnergyDemand } from "@/engine/calculator";
-import { ZoneInput } from "@/engine/types";
+import { loadClimateData } from "@/engine/climate-data";
+import { ZoneInput, ClimateData } from "@/engine/types";
 import { Zone } from "@/types/project";
 import {
     Select,
@@ -52,9 +53,20 @@ export default function DebugPage() {
                     })
                 );
 
+
+                // Load Weather
+                let weatherData: ClimateData | undefined;
+                if (project?.weatherStationId) {
+                    try {
+                        weatherData = await loadClimateData(project.weatherStationId);
+                    } catch (e) {
+                        console.warn("Failed to load weather data", e);
+                    }
+                }
+
                 const results = calculateEnergyDemand(
                     zoneInputs,
-                    project?.weatherStationId,
+                    weatherData,
                     project?.mainStructure,
                     project?.ventilationConfig,
                     project?.ventilationUnits

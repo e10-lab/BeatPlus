@@ -1,98 +1,15 @@
+
+import stations from './stations.json';
+
 export interface WeatherStation {
     id: number;
-    name: string; // 관측소명
+    name: string;
     latitude: number;
     longitude: number;
-    elevation: number; // 해발고도 (m)
-    monthlyTemp: number[]; // 1월 ~ 12월 평균 기온 (°C)
-    monthlySolar: number[]; // 1월 ~ 12월 월간 총 일사량 (kWh/m²/month)
-    // 참고: 원래 설명에 있던 일평균(day) vs 월합계(month) 논의 결과, 월합계를 사용하기로 함.
+    elevation: number;
+    monthlyTemp: number[];
+    monthlySolar: number[];
+    filename: string;
 }
 
-// 데이터 출처: 2021-2025 표준 한국 기후 패턴에 기반한 시뮬레이션 평균값
-// 실제 시나리오에서는 처리된 CSV/JSON 파일 등에서 로드됨.
-export const KOREA_WEATHER_STATIONS: WeatherStation[] = [
-    {
-        id: 108,
-        name: "서울 (Seoul)",
-        latitude: 37.5714,
-        longitude: 126.9658,
-        elevation: 85.5,
-        // 1월..12월 (2021-2025 평균 기온, 근사값)
-        monthlyTemp: [-2.0, 1.5, 7.5, 14.0, 19.5, 23.5, 26.5, 27.0, 22.5, 15.5, 8.0, 0.5],
-        // 1월..12월 (월간 총 일사량 kWh/m²/month, 근사값) (요청된 "월합계일사량" 사용)
-        monthlySolar: [64.0, 84.0, 119.0, 144.0, 158.0, 153.0, 128.0, 138.0, 123.0, 98.0, 69.0, 59.0]
-    },
-    {
-        id: 112,
-        name: "인천 (Incheon)",
-        latitude: 37.4776,
-        longitude: 126.6243,
-        elevation: 66.0,
-        monthlyTemp: [-1.5, 1.0, 6.5, 13.0, 18.0, 22.0, 25.5, 26.5, 22.0, 16.0, 8.5, 1.0],
-        monthlySolar: [62.0, 82.0, 118.0, 140.0, 155.0, 150.0, 125.0, 135.0, 120.0, 95.0, 68.0, 58.0]
-    },
-    {
-        id: 119,
-        name: "수원 (Suwon)",
-        latitude: 37.257,
-        longitude: 126.983,
-        elevation: 33.5,
-        monthlyTemp: [-2.5, 1.0, 7.0, 13.5, 19.0, 23.0, 26.0, 26.5, 21.5, 15.0, 7.5, -0.5],
-        monthlySolar: [64.0, 84.0, 119.0, 144.0, 158.0, 153.0, 128.0, 138.0, 123.0, 98.0, 69.0, 59.0]
-    },
-    {
-        id: 133,
-        name: "대전 (Daejeon)",
-        latitude: 36.3722,
-        longitude: 127.3722,
-        elevation: 72.3,
-        monthlyTemp: [-1.0, 2.0, 8.0, 15.0, 20.0, 24.0, 27.0, 27.5, 22.5, 16.0, 9.0, 1.5],
-        monthlySolar: [68.0, 88.0, 125.0, 150.0, 165.0, 160.0, 135.0, 145.0, 128.0, 105.0, 72.0, 62.0]
-    },
-    {
-        id: 143,
-        name: "대구 (Daegu)",
-        latitude: 35.8279,
-        longitude: 128.6200,
-        elevation: 59.8,
-        monthlyTemp: [1.0, 4.0, 9.5, 16.0, 21.0, 25.0, 28.0, 28.5, 23.5, 17.5, 10.5, 3.5],
-        monthlySolar: [72.0, 92.0, 130.0, 155.0, 170.0, 165.0, 140.0, 150.0, 132.0, 110.0, 75.0, 65.0]
-    },
-    {
-        id: 156,
-        name: "광주 (Gwangju)",
-        latitude: 35.1729,
-        longitude: 126.8916,
-        elevation: 72.0,
-        monthlyTemp: [1.5, 4.0, 9.0, 15.5, 20.5, 24.5, 27.5, 28.0, 23.5, 17.5, 11.0, 4.0],
-        monthlySolar: [70.0, 90.0, 128.0, 152.0, 168.0, 162.0, 138.0, 148.0, 130.0, 108.0, 74.0, 64.0]
-    },
-    {
-        id: 159,
-        name: "부산 (Busan)",
-        latitude: 35.1047,
-        longitude: 129.032,
-        elevation: 70.5,
-        monthlyTemp: [3.5, 5.5, 10.0, 15.0, 19.5, 23.0, 26.0, 27.5, 23.5, 18.5, 12.5, 6.0],
-        monthlySolar: [75.0, 95.0, 132.0, 158.0, 172.0, 168.0, 145.0, 155.0, 135.0, 112.0, 78.0, 68.0]
-    },
-    {
-        id: 184,
-        name: "제주 (Jeju)",
-        latitude: 33.5141,
-        longitude: 126.5297,
-        elevation: 20.7,
-        monthlyTemp: [6.5, 7.5, 11.0, 16.0, 20.0, 23.5, 27.5, 28.5, 24.5, 20.0, 14.5, 9.0],
-        monthlySolar: [60.0, 80.0, 115.0, 140.0, 155.0, 145.0, 130.0, 140.0, 120.0, 100.0, 65.0, 55.0]
-    },
-    {
-        id: 105,
-        name: "강릉 (Gangneung)",
-        latitude: 37.7519,
-        longitude: 128.891,
-        elevation: 26.3,
-        monthlyTemp: [0.5, 2.5, 7.5, 14.0, 19.0, 22.5, 26.0, 26.5, 21.5, 16.5, 9.5, 3.0],
-        monthlySolar: [68.0, 88.0, 122.0, 148.0, 162.0, 158.0, 132.0, 142.0, 125.0, 102.0, 72.0, 63.0]
-    }
-];
+export const KOREA_WEATHER_STATIONS: WeatherStation[] = stations as WeatherStation[];

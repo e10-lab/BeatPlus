@@ -42,7 +42,7 @@ const coolingVentUnit = {
     efficiency: 0.75, supplyFlowRate: 0, exhaustFlowRate: 0
 };
 const caseFreeCool = createZone('FreeCool', {
-    usageType: '21_datacenter', // High Internal Load (Datacenter or just tweak gains) -> Datacenter has 24h usage, maybe too much.
+    // usageType: '21_datacenter', // Replaced by 9_lecture_hall below
     // Let's stick to Office but override internal gains if possible? 
     // Types don't allow easy override of metabolicHeat.
     // Use '9_lecture_hall' (High Density)
@@ -74,7 +74,7 @@ const resFreeCool = calculateEnergyDemand([caseFreeCool], undefined, undefined, 
 const may = resFreeCool.monthly[4];
 console.log(`May (Te=19.5):`);
 console.log(`- Vent Loss (QV): ${may.QV.toFixed(1)} kWh (Should be high due to free cooling boost)`);
-console.log(`- Cooling (Qc): ${may.Qc.toFixed(1)} kWh`);
+console.log(`- Cooling (Qc): ${may.Q_cooling.toFixed(1)} kWh`);
 // Compare with Jan (Te=-1.6, Minimal Vent)
 const jan = resFreeCool.monthly[0];
 console.log(`Jan (Te=-1.6):`);

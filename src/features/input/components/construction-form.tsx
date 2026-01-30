@@ -39,7 +39,9 @@ const layerSchema = z.object({
     materialId: z.string().min(1, "Material required"),
     thickness: z.coerce.number().min(0.001, "Min 1mm"),
     customName: z.string().optional(),
-    customThermalConductivity: z.number().optional()
+    customThermalConductivity: z.number().optional(),
+    customDensity: z.number().optional(),
+    customSpecificHeat: z.number().optional()
 });
 
 // Schema for Construction Form
@@ -149,19 +151,33 @@ function SortableLayerRow({ id, ...props }: SortableLayerRowProps) {
 }
 
 export function ConstructionForm({ projectId, initialData, onSave, onCancel }: ConstructionFormProps) {
+    const defaultFormValues: ConstructionFormValues = initialData ? {
+        ...initialData,
+        layers: initialData.layers.map(l => ({
+            id: l.id,
+            materialId: l.materialId,
+            thickness: l.thickness,
+            customName: l.name,
+            customThermalConductivity: l.thermalConductivity,
+            customDensity: l.density,
+            customSpecificHeat: l.specificHeat
+        })),
+        absorptionCoefficient: initialData.absorptionCoefficient ?? 0.5,
+    } : {
+        id: uuidv4(),
+        projectId,
+        name: "",
+        type: "wall_exterior",
+        layers: [{ id: uuidv4(), materialId: "", thickness: 0.1 }],
+        r_si: SURFACE_HEAT_RESISTANCE.R_SI.WALL,
+        r_se: SURFACE_HEAT_RESISTANCE.R_SE.DIRECT,
+        frameId: "",
+        absorptionCoefficient: 0.5,
+    };
+
     const form = useForm<ConstructionFormValues>({
         resolver: zodResolver(constructionSchema) as any,
-        defaultValues: initialData || {
-            id: uuidv4(),
-            projectId,
-            name: "",
-            type: "wall_exterior",
-            layers: [{ id: uuidv4(), materialId: "", thickness: 0.1 }],
-            r_si: SURFACE_HEAT_RESISTANCE.R_SI.WALL,
-            r_se: SURFACE_HEAT_RESISTANCE.R_SE.DIRECT,
-            frameId: "",
-            absorptionCoefficient: initialData?.absorptionCoefficient ?? 0.5,
-        },
+        defaultValues: defaultFormValues,
     });
 
     const { fields, append, remove, insert, move, replace } = useFieldArray({
@@ -303,7 +319,9 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
             return {
                 ...l,
                 name: l.materialId === "custom" ? l.customName : mat?.name,
-                thermalConductivity: l.materialId === "custom" ? l.customThermalConductivity : mat?.thermalConductivity
+                thermalConductivity: l.materialId === "custom" ? l.customThermalConductivity : mat?.thermalConductivity,
+                density: l.materialId === "custom" ? l.customDensity : mat?.density,
+                specificHeat: l.materialId === "custom" ? l.customSpecificHeat : mat?.specificHeat
             };
         });
 
@@ -336,9 +354,19 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                             <FormItem className="lg:col-span-1 min-w-0">
                                 <FormLabel>이름 (Name)</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="예: 외벽 타입 A (e.g. Exterior Wall Type A)" {...field} />
+                                    <div className="relative">
+                                        <Input
+                                            placeholder="예: 외벽 타입 A (e.g. Exterior Wall Type A)"
+                                            className={form.formState.errors.name ? "pr-24 border-destructive focus-visible:ring-destructive" : ""}
+                                            {...field}
+                                        />
+                                        {form.formState.errors.name && (
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-destructive pointer-events-none bg-white px-1">
+                                                {form.formState.errors.name.message}
+                                            </span>
+                                        )}
+                                    </div>
                                 </FormControl>
-                                <FormMessage />
                             </FormItem>
                         )}
                     />
@@ -500,6 +528,21 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                                     </div>}
                             </div>
                         )}
+
+                        {/* Headers for List */
+                            fields.length > 0 && currentCategory !== "window" && currentCategory !== "door" && (
+                                <div className="hidden md:grid grid-cols-[30px_140px_1fr_80px_80px_80px_100px_90px] gap-4 px-2 py-2 text-xs font-semibold text-muted-foreground bg-slate-50 border-b">
+                                    <div className="text-center">#</div>
+                                    <div>분류</div>
+                                    <div>자재명</div>
+                                    <div className="text-right">열전도율<br />(W/mK)</div>
+                                    <div className="text-right">밀도<br />(kg/m³)</div>
+                                    <div className="text-right">비열<br />(J/kgK)</div>
+                                    <div className="text-right">두께<br />(mm)</div>
+                                    <div className="text-center">작업</div>
+                                </div>
+                            )
+                        }
 
                         {/* Drag and Drop Layer List */}
                         <DndContext

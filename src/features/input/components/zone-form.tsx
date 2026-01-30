@@ -205,12 +205,22 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                             control={form.control}
                             name="name"
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="min-w-0">
                                     <FormLabel>존 이름</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="예: 1층 사무실" {...field} />
+                                        <div className="relative">
+                                            <Input
+                                                placeholder="예: 1층 사무실"
+                                                className={form.formState.errors.name ? "pr-24 border-destructive focus-visible:ring-destructive" : ""}
+                                                {...field}
+                                            />
+                                            {form.formState.errors.name && (
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-destructive pointer-events-none bg-white px-1">
+                                                    {form.formState.errors.name.message}
+                                                </span>
+                                            )}
+                                        </div>
                                     </FormControl>
-                                    <FormMessage />
                                 </FormItem>
                             )}
                         />
@@ -221,7 +231,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="flex items-center gap-2">
-                                            용도 프로필 (DIN V 18599-10)
+                                            용도 프로필 (DIN/TS 18599-10)
                                             {selectedProfile && (
                                                 <Dialog>
                                                     <DialogTrigger asChild>
@@ -236,7 +246,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                                                 프로필 상세 정보: {selectedProfile.name}
                                                             </DialogTitle>
                                                             <DialogDescription>
-                                                                DIN V 18599-10 표준에 따른 해당 용도의 표준 설정값입니다.
+                                                                DIN/TS 18599-10 표준에 따른 해당 용도의 표준 설정값입니다.
                                                             </DialogDescription>
                                                         </DialogHeader>
 
@@ -367,12 +377,23 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                             control={form.control}
                             name="area"
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="min-w-0">
                                     <FormLabel>바닥 면적 (m²)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
+                                        <div className="relative">
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                className={form.formState.errors.area ? "pr-24 border-destructive focus-visible:ring-destructive" : ""}
+                                                {...field}
+                                            />
+                                            {form.formState.errors.area && (
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-destructive pointer-events-none bg-white px-1">
+                                                    {form.formState.errors.area.message}
+                                                </span>
+                                            )}
+                                        </div>
                                     </FormControl>
-                                    <FormMessage />
                                 </FormItem>
                             )}
                         />
@@ -380,12 +401,23 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                             control={form.control}
                             name="height"
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="min-w-0">
                                     <FormLabel>천정고 (m)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.1" {...field} />
+                                        <div className="relative">
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                className={form.formState.errors.height ? "pr-24 border-destructive focus-visible:ring-destructive" : ""}
+                                                {...field}
+                                            />
+                                            {form.formState.errors.height && (
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-destructive pointer-events-none bg-white px-1">
+                                                    {form.formState.errors.height.message}
+                                                </span>
+                                            )}
+                                        </div>
                                     </FormControl>
-                                    <FormMessage />
                                 </FormItem>
                             )}
                         />

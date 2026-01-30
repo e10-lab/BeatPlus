@@ -28,7 +28,7 @@ export interface Project {
         type: "natural" | "mechanical";
         systemType?: "balanced" | "exhaust"; // 신규: 열회수와 분리됨
         heatRecoveryEfficiency: number; // 0-100%
-        infiltrationCategory?: "I" | "II" | "III" | "IV"; // DIN V 18599-2 표 6
+        infiltrationCategory?: "I" | "II" | "III" | "IV"; // DIN/TS 18599-2 표 6
         hasALD?: boolean; // 공기 전달 장치 (Air Transfer Devices)
         n50: number; // 계산된 표준 n50 값 (또는 조회값)
         isMeasured?: boolean; // true일 경우, n50을 수동으로 입력함
@@ -150,6 +150,8 @@ export interface Layer {
     // Computed/Cached values for display
     name?: string;
     thermalConductivity?: number;
+    density?: number;
+    specificHeat?: number;
 }
 
 export interface Construction {

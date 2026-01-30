@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ZoneInput, CalculationResults } from "@/engine/types";
+import { ZoneInput, CalculationResults, ClimateData } from "@/engine/types";
 import { calculateEnergyDemand } from "@/engine/calculator";
+import { loadClimateData } from "@/engine/climate-data";
 import { getProject } from "@/services/project-service";
 import { getZones } from "@/services/zone-service";
 import { getSurfaces } from "@/services/surface-service";
@@ -48,10 +49,20 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                     })
                 );
 
-                // 4. Run Calculation
+                // 4. Load Weather Data
+                let weatherData: ClimateData | undefined;
+                if (project?.weatherStationId) {
+                    try {
+                        weatherData = await loadClimateData(project.weatherStationId);
+                    } catch (e) {
+                        console.warn("Failed to load weather data, using default", e);
+                    }
+                }
+
+                // 5. Run Calculation
                 const calcResults = calculateEnergyDemand(
                     zoneInputs,
-                    project?.weatherStationId,
+                    weatherData,
                     project?.mainStructure,
                     project?.ventilationConfig,
                     project?.ventilationUnits // Pass detailed units for zone-specific lookup
@@ -229,8 +240,8 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                                             <td className={`px-4 py-2 ${m.QV > 0 ? "text-blue-600" : "text-red-600"}`}>{(Math.abs(m.QV) / area).toFixed(1)}</td>
                                             <td className="px-4 py-2 text-red-600">{(m.QS / area).toFixed(1)}</td>
                                             <td className="px-4 py-2 text-red-600">{(m.QI / area).toFixed(1)}</td>
-                                            <td className="px-4 py-2 font-bold text-red-700">{(m.Qh / area).toFixed(1)}</td>
-                                            <td className="px-4 py-2 font-bold text-blue-700">{(m.Qc / area).toFixed(1)}</td>
+                                            <td className="px-4 py-2 font-bold text-red-700">{(m.Q_heating / area).toFixed(1)}</td>
+                                            <td className="px-4 py-2 font-bold text-blue-700">{(m.Q_cooling / area).toFixed(1)}</td>
                                         </tr>
                                     );
                                 })}

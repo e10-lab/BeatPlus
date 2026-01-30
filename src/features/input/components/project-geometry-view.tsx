@@ -252,8 +252,8 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
             <TabsList>
                 <TabsTrigger value="zones">존 관리 (Zones)</TabsTrigger>
-                <TabsTrigger value="systems">설비 (Systems)</TabsTrigger>
                 <TabsTrigger value="constructions">외피 유형 (Assemblies)</TabsTrigger>
+                <TabsTrigger value="systems">설비 (Systems)</TabsTrigger>
             </TabsList>
 
             <TabsContent value="zones" className="space-y-4">
@@ -445,6 +445,24 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
 
             </TabsContent>
 
+            <TabsContent value="constructions">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>외피 유형 관리 (Assembly Manager)</CardTitle>
+                        <CardDescription>
+                            벽, 창, 지붕 등의 외피 유형(Assembly)을 정의하고 열관류율(U-value)을 관리합니다.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ConstructionManager
+                            constructions={constructions}
+                            projectId={projectId}
+                            onUpdate={loadConstructions}
+                        />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
             <TabsContent value="systems">
                 <Card>
                     <CardHeader>
@@ -461,24 +479,6 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                                 onUpdate={loadProjectStats} // Re-fetch project to update list
                             />
                         )}
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-            <TabsContent value="constructions">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>외피 유형 관리 (Assembly Manager)</CardTitle>
-                        <CardDescription>
-                            벽, 창, 지붕 등의 외피 유형(Assembly)을 정의하고 열관류율(U-value)을 관리합니다.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ConstructionManager
-                            constructions={constructions}
-                            projectId={projectId}
-                            onUpdate={loadConstructions}
-                        />
                     </CardContent>
                 </Card>
             </TabsContent>

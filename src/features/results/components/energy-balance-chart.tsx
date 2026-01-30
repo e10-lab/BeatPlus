@@ -19,8 +19,8 @@ export function EnergyBalanceChart({ data, totalArea }: EnergyBalanceChartProps)
         QV_spec: d.QV / area,
         QS_spec: d.QS / area,
         QI_spec: d.QI / area,
-        Qh_spec: d.Qh / area,
-        Qc_spec: d.Qc / area
+        Qh_spec: d.Q_heating / area,
+        Qc_spec: d.Q_cooling / area
     }));
 
     return (

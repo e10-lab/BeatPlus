@@ -70,7 +70,7 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
     return (
         <div className="flex flex-col">
             {/* Desktop Grid Layout */}
-            <div className="hidden md:grid grid-cols-[30px_220px_1fr_100px_120px_90px] gap-4 items-center mb-2">
+            <div className="hidden md:grid grid-cols-[30px_140px_1fr_80px_80px_80px_100px_90px] gap-4 items-center mb-2">
                 {/* 0. Index & Drag Handle */}
                 <div className="flex flex-col items-center justify-center gap-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground" {...dragHandleProps}>
                     <GripVertical className="w-4 h-4" />
@@ -78,7 +78,7 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                 </div>
 
                 {/* 1. Category */}
-                <div>
+                <div className="min-w-0">
                     <FormItem className="space-y-0">
                         <Select
                             value={category}
@@ -88,6 +88,8 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                                     form.setValue(`layers.${index}.materialId`, "custom", { shouldDirty: true });
                                     form.setValue(`layers.${index}.customName`, "");
                                     form.setValue(`layers.${index}.customThermalConductivity`, 0);
+                                    form.setValue(`layers.${index}.customDensity`, 0);
+                                    form.setValue(`layers.${index}.customSpecificHeat`, 0);
                                     form.setValue(`layers.${index}.thickness`, 0.1);
                                 } else {
                                     const firstMat = DEFAULT_MATERIALS.find(m => m.category === newCat);
@@ -97,18 +99,20 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                                         // Clear custom fields
                                         form.setValue(`layers.${index}.customName`, undefined);
                                         form.setValue(`layers.${index}.customThermalConductivity`, undefined);
+                                        form.setValue(`layers.${index}.customDensity`, undefined);
+                                        form.setValue(`layers.${index}.customSpecificHeat`, undefined);
                                     }
                                 }
                             }}
                         >
                             <FormControl>
-                                <SelectTrigger className="h-9">
+                                <SelectTrigger className="h-9 text-xs truncate">
                                     <SelectValue placeholder="분류" />
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
                                 {availableCategories.map(cat => (
-                                    <SelectItem key={cat} value={cat}>
+                                    <SelectItem key={cat} value={cat} className="text-xs">
                                         {getCategoryLabel(cat)}
                                     </SelectItem>
                                 ))}
@@ -118,7 +122,7 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                 </div>
 
                 {/* 2. Material Name OR Custom Name Input */}
-                <div>
+                <div className="min-w-0">
                     {category === "custom" ? (
                         <FormField
                             control={form.control}
@@ -129,7 +133,7 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                                         <Input
                                             {...field}
                                             placeholder="자재명 입력"
-                                            className="h-9"
+                                            className="h-9 text-xs"
                                         />
                                     </FormControl>
                                 </FormItem>
@@ -152,13 +156,13 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                                         value={field.value}
                                     >
                                         <FormControl>
-                                            <SelectTrigger className="h-9">
+                                            <SelectTrigger className="h-9 text-xs truncate">
                                                 <SelectValue placeholder="자재 선택" />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
                                             {filteredMaterials.map(m => (
-                                                <SelectItem key={m.id} value={m.id}>
+                                                <SelectItem key={m.id} value={m.id} className="text-xs">
                                                     {m.name}
                                                 </SelectItem>
                                             ))}
@@ -170,8 +174,8 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                     )}
                 </div>
 
-                {/* 3. Thermal Conductivity (Read Only or Editable) */}
-                <div className="text-right">
+                {/* 3. Thermal Conductivity */}
+                <div className="text-right min-w-0">
                     {category === "custom" ? (
                         <FormField
                             control={form.control}
@@ -185,7 +189,7 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                                             min="0"
                                             {...field}
                                             onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                                            className="h-9 text-right"
+                                            className="h-9 text-right text-xs px-2"
                                             placeholder="0.000"
                                         />
                                     </FormControl>
@@ -193,13 +197,71 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                             )}
                         />
                     ) : (
-                        <div className="h-9 px-2 py-2 border rounded-md bg-muted text-sm flex items-center justify-end whitespace-nowrap overflow-hidden text-ellipsis">
+                        <div className="h-9 px-2 py-2 border rounded-md bg-muted text-xs flex items-center justify-end whitespace-nowrap overflow-hidden text-ellipsis">
                             {initialMat?.thermalConductivity || "-"}
                         </div>
                     )}
                 </div>
 
-                {/* 4. Thickness Input */}
+                {/* 4. Density */}
+                <div className="text-right min-w-0">
+                    {category === "custom" ? (
+                        <FormField
+                            control={form.control}
+                            name={`layers.${index}.customDensity`}
+                            render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            step="1"
+                                            min="0"
+                                            {...field}
+                                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                            className="h-9 text-right text-xs px-2"
+                                            placeholder="0"
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    ) : (
+                        <div className="h-9 px-2 py-2 border rounded-md bg-muted text-xs flex items-center justify-end whitespace-nowrap overflow-hidden text-ellipsis">
+                            {initialMat?.density || "-"}
+                        </div>
+                    )}
+                </div>
+
+                {/* 5. Specific Heat */}
+                <div className="text-right min-w-0">
+                    {category === "custom" ? (
+                        <FormField
+                            control={form.control}
+                            name={`layers.${index}.customSpecificHeat`}
+                            render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            step="10"
+                                            min="0"
+                                            {...field}
+                                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                            className="h-9 text-right text-xs px-2"
+                                            placeholder="0"
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    ) : (
+                        <div className="h-9 px-2 py-2 border rounded-md bg-muted text-xs flex items-center justify-end whitespace-nowrap overflow-hidden text-ellipsis">
+                            {initialMat?.specificHeat || "-"}
+                        </div>
+                    )}
+                </div>
+
+                {/* 6. Thickness Input */}
                 <div>
                     <FormField
                         control={form.control}
@@ -218,7 +280,7 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                                                 const mm = parseFloat(e.target.value);
                                                 field.onChange(isNaN(mm) ? 0 : mm / 1000);
                                             }}
-                                            className="h-9 pr-6 text-right"
+                                            className="h-9 pr-6 text-right text-xs"
                                         />
                                         <span className="absolute right-2 top-2.5 text-xs text-muted-foreground">mm</span>
                                     </div>
@@ -228,7 +290,7 @@ export const LayerRow = ({ form, index, remove, insert, length, isLastLayer, cat
                     />
                 </div>
 
-                {/* 5. Actions */}
+                {/* 7. Actions */}
                 <div className="flex gap-1 justify-center">
                     {/* Inline Add Button */}
                     <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => {
