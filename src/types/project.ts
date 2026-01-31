@@ -35,7 +35,10 @@ export interface Project {
     };
     ventilationUnits?: VentilationUnit[];
     automationConfig?: BuildingAutomationConfig; // DIN 18599-11
+    systems?: BuildingSystem[]; // Centralized list of all technical systems
 }
+
+import { BuildingSystem } from "./system";
 
 export interface BuildingAutomationConfig {
     automationClass: "A" | "B" | "C" | "D"; // A: High performance, D: Non-energy efficient
@@ -56,19 +59,15 @@ export interface VentilationUnit {
 }
 
 export type ZoneUsageType =
-    | "1_single_office" | "2_group_office" | "3_open_plan_office" | "4_meeting" | "5_counter"
-    | "6_retail" | "7_retail_refrig" | "8_classroom" | "9_lecture_hall"
-    | "10_bed_room" | "11_hotel_room" | "12_canteen" | "13_restaurant"
-    | "14_kitchen" | "15_kitchen_prep" | "16_wc" | "17_common_area"
-    | "18_support_store" | "19_corridor_care" | "20_storage_uncond" | "21_datacenter"
-    | "22_1_workshop_light" | "22_2_workshop_medium" | "22_3_workshop_heavy"
-    | "23_theater_audience" | "24_cloakroom" | "25_theater_foh" | "26_stage" | "27_exhibition"
-    | "28_fair" // Note: Added based on search results for consistency if needed, but keeping list strict
-    | "29_library_public" | "30_library_stack" | "31_gym"
-    | "32_parking_office" | "33_parking_public"
-    | "34_sauna" | "35_fitness" | "36_lab" | "37_exam_room" | "38_icu" | "39_corridor_icu"
-    | "40_medical_practice" | "41_logistics" | "42_server_room"
-    | "residential_single" | "residential_multi" | "residential_general";
+    | "1_office" | "2_open_plan" | "3_meeting" | "4_library" | "5_retail"
+    | "6_retail_large" | "7_classroom" | "8_lecture_hall" | "9_bed_room" | "10_hotel_room"
+    | "11_canteen" | "12_restaurant" | "13_kitchen" | "14_storage_heated" | "15_storage_unheated"
+    | "16_parking" | "17_workshop_light" | "17_1_workshop_medium" | "18_workshop_heavy" | "19_gym"
+    | "20_fitness" | "21_pool" | "22_lab" | "23_exam_room" | "24_icu" | "25_corridor_care"
+    | "26_medical_practice" | "27_exhibition" | "28_trade_fair"
+    | "33_foyer" | "34_retail_refrig" | "35_kitchen_high" | "36_hotel_wellness"
+    | "38_server" | "39_datacenter" | "41_logistics"
+    | "42_res_single" | "43_res_multi" | "44_dorm";
 
 export interface Zone {
     id?: string;
@@ -87,12 +86,17 @@ export interface Zone {
         powerDensity?: number; // W/m² (Optional override)
         efficacy?: number; // lm/W (Optional override, default ~60)
     };
+    linkedLightingSystemId?: string; // Optional link to a shared LightingSystem
     orderIndex?: number;
     isExcluded?: boolean;
     linkedVentilationUnitIds?: string[]; // Reference to multiple VentilationUnits
     ventilationMode?: "natural" | "mechanical" | "balanced_mech"; // Explicit mode per zone
     thermalCapacitySpecific?: number; // Wh/(m²·K) - Specific Thermal Capacity
     heatingReducedMode?: "setback" | "shutdown"; // Night/Weekend operation mode
+
+    // Geometry Visualization Properties (Removed)
+    // coordinates/dimensions removed as per request
+    color?: string;
 }
 
 export type SurfaceType =

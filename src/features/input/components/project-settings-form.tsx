@@ -105,8 +105,8 @@ export function ProjectSettingsForm({ project, onUpdate }: ProjectSettingsFormPr
             address: project.location?.address || "",
             detailAddress: project.location?.detailAddress || "",
             city: project.location?.city || "",
-            climateZone: project.location?.climateZone || undefined,
-            weatherStationId: project.weatherStationId || undefined,
+            climateZone: project.location?.climateZone ?? undefined,
+            weatherStationId: project.weatherStationId ?? undefined,
             totalArea: project.totalArea || 0,
             siteArea: project.siteArea || 0,
             buildingArea: project.buildingArea || 0,
@@ -189,7 +189,7 @@ export function ProjectSettingsForm({ project, onUpdate }: ProjectSettingsFormPr
                         latitude: coords.lat,
                         longitude: coords.lng,
                     },
-                    weatherStationId: stationId,
+                    weatherStationId: stationId ?? undefined,
                 });
             }
         });
@@ -219,7 +219,7 @@ export function ProjectSettingsForm({ project, onUpdate }: ProjectSettingsFormPr
                 permitDate: values.permitDate,
                 constructionStartDate: values.constructionStartDate,
                 usageApprovalDate: values.usageApprovalDate,
-                weatherStationId: project.weatherStationId, // Preserve the calculated ID
+                weatherStationId: project.weatherStationId ?? undefined, // Preserve the calculated ID or undefined if none
             });
 
             onUpdate({

@@ -1,5 +1,5 @@
 
-import { Project, Zone, Surface, SurfaceType } from "@/types/project";
+import { Zone, Surface } from "@/types/project";
 
 export interface ZoneInput extends Zone {
     projectId: string;
@@ -37,6 +37,13 @@ export interface HourlyResult {
     Ti: number; // Indoor Temp (Operative/Air)
     Q_heating: number; // Heating Load (Wh)
     Q_cooling: number; // Cooling Load (Wh)
+    Q_lighting: number; // Lighting Energy for this hour (Wh)
+    Q_dhw: number; // Domestic Hot Water Energy (Wh)
+    Q_aux: number; // Auxiliary Energy (Fans, Pumps) (Wh)
+
+    // PV Added
+    pvGeneration?: number; // Wh
+
     // Detailed 5R1C node temperatures for debugging
     theta_m?: number;
     theta_s?: number;
@@ -48,6 +55,13 @@ export interface MonthlyResult {
     // Aggregated from Hourly
     Q_heating: number; // kWh (Qh)
     Q_cooling: number; // kWh (Qc)
+    Q_lighting: number; // kWh (Q_lighting)
+    Q_dhw: number; // kWh (DHW)
+    Q_aux: number; // kWh (Auxiliary)
+    // PV Added
+    pvGeneration: number; // kWh
+    selfConsumption?: number; // kWh
+
     avg_Ti: number; // Average Indoor Temp
 
     // Detailed Energy Balance (aggregated from hourly)
@@ -70,9 +84,36 @@ export interface MonthlyResult {
 export interface YearlyResult {
     heatingDemand: number; // kWh/a
     coolingDemand: number; // kWh/a
+    lightingDemand: number; // kWh/a
+    dhwDemand: number; // kWh/a
+    auxDemand: number; // kWh/a (Fans/Pumps)
     totalArea: number;
     specificHeatingDemand: number; // kWh/(m²a)
     specificCoolingDemand: number; // kWh/(m²a)
+
+    // PV Added
+    pvGeneration: number; // kWh
+    selfConsumption: number; // kWh
+    pvExport: number; // kWh
+
+    finalEnergy?: {
+        heating: number;
+        cooling: number;
+        dhw: number;
+        lighting: number;
+        auxiliary: number;
+    };
+    primaryEnergy?: {
+        heating: number;
+        cooling: number;
+        dhw: number;
+        lighting: number;
+        auxiliary: number;
+        total: number;
+        // PV Credit
+        pvCredit?: number; // Negative value reducing total
+    };
+    co2Emissions?: number; // kgCO2/a
 }
 
 export interface ZoneResult {
@@ -88,4 +129,3 @@ export interface CalculationResults {
     yearly: YearlyResult; // Project level aggregation
     monthly: MonthlyResult[]; // Project level aggregation
 }
-

@@ -11,7 +11,7 @@ import {
     setDoc,
     writeBatch
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, sanitizeData } from "@/lib/firebase";
 import { Construction } from "@/types/project";
 import { getZones } from "./zone-service";
 import { getSurfaces, updateSurface, deleteSurface } from "./surface-service";
@@ -19,23 +19,17 @@ import { getSurfaces, updateSurface, deleteSurface } from "./surface-service";
 const PROJECTS_COLLECTION = "projects";
 const CONSTRUCTIONS_COLLECTION = "constructions";
 
-const cleanUndefined = (obj: any): any => {
-    return JSON.parse(JSON.stringify(obj));
-};
+
 
 export const createConstruction = async (projectId: string, constructionData: Omit<Construction, "id" | "projectId"> & { id?: string }) => {
     const constructionsRef = collection(db, PROJECTS_COLLECTION, projectId, CONSTRUCTIONS_COLLECTION);
 
-    // Removing 'id' from data payload if it exists
-    const { id, ...data } = constructionData as any;
-    const cleanedData = cleanUndefined(data);
-
-    const docRef = await addDoc(constructionsRef, {
-        ...cleanedData,
+    const docRef = await addDoc(constructionsRef, sanitizeData({
+        ...constructionData,
         projectId,
         createdAt: new Date(),
         updatedAt: new Date()
-    });
+    }));
     return docRef.id;
 };
 
@@ -62,14 +56,11 @@ export const getConstructions = async (projectId: string): Promise<Construction[
 
 export const updateConstruction = async (projectId: string, constructionId: string, constructionData: Partial<Construction>) => {
     const constructionRef = doc(db, PROJECTS_COLLECTION, projectId, CONSTRUCTIONS_COLLECTION, constructionId);
-    // Remove id from update payload
-    const { id, ...data } = constructionData as any;
-    const cleanedData = cleanUndefined(data);
 
-    await updateDoc(constructionRef, {
-        ...cleanedData,
+    await updateDoc(constructionRef, sanitizeData({
+        ...constructionData,
         updatedAt: new Date()
-    });
+    }));
 
     // Cascade update: If U-value changed, update linked surfaces
     if (constructionData.uValue !== undefined) {

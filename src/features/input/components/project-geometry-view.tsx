@@ -1,5 +1,7 @@
 "use client";
 
+import { SystemGraphView } from "@/features/systems/components/system-graph-view";
+import { LayoutList, Network } from "lucide-react";
 import { useState } from "react";
 import { Zone } from "@/types/project";
 import { ZoneList } from "./zone-list";
@@ -26,6 +28,19 @@ import { Input } from "@/components/ui/input";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { BuildingSystem } from "@/types/system";
+import { SystemList } from "@/features/systems/components/system-list";
+import { SystemForm } from "@/features/systems/components/system-form";
+import { addSystem, updateSystem, deleteSystem } from "@/services/system-service";
+import { getZones } from "@/services/zone-service";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ProjectGeometryViewProps {
     projectId: string;
@@ -33,24 +48,31 @@ interface ProjectGeometryViewProps {
 
 export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
     // ...
-    const [viewMode, setViewMode] = useState<"list" | "form" | "zone-detail" | "surface-form">("list");
+    const [viewMode, setViewMode] = useState<"list" | "form" | "zone-detail" | "surface-form" | "system-form">("list");
     const [selectedTab, setSelectedTab] = useState("zones");
     const [constructions, setConstructions] = useState<Construction[]>([]);
     const [projectStats, setProjectStats] = useState<ProjectStats>({ totalVolume: 0, totalEnvelopeArea: 0 });
     const [project, setProject] = useState<Project | null>(null);
     const [selectedZone, setSelectedZone] = useState<Zone | undefined>(undefined);
     const [selectedSurface, setSelectedSurface] = useState<any | undefined>(undefined);
+    const [selectedSystem, setSelectedSystem] = useState<BuildingSystem | undefined>(undefined);
+    const [zones, setZones] = useState<Zone[]>([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [isSystemGraphMode, setIsSystemGraphMode] = useState(false);
+    const [deleteSystemConfirmOpen, setDeleteSystemConfirmOpen] = useState(false);
+    const [systemToDelete, setSystemToDelete] = useState<{ id: string; name: string } | null>(null);
 
     // Load Constructions on Mount
     useEffect(() => {
         loadConstructions();
         loadProjectStats();
+        loadZones();
     }, [projectId]);
 
     // Reload stats when refreshTrigger changes (e.g. after zone add/edit)
     useEffect(() => {
         loadProjectStats();
+        loadZones();
     }, [refreshTrigger]);
 
     const loadConstructions = async () => {
@@ -132,6 +154,15 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
         }
     };
 
+    const loadZones = async () => {
+        try {
+            const data = await getZones(projectId);
+            setZones(data);
+        } catch (error) {
+            console.error("Failed to load zones:", error);
+        }
+    };
+
 
 
     const handleAddZone = () => {
@@ -182,6 +213,52 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
         setConstructions(updatedList);
     };
 
+    // System Handlers
+    const handleAddSystem = () => {
+        setSelectedSystem(undefined);
+        setViewMode("system-form");
+    };
+
+    const handleEditSystem = (sys: BuildingSystem) => {
+        setSelectedSystem(sys);
+        setViewMode("system-form");
+    };
+
+    const handleDeleteSystemClick = (id: string) => {
+        const sys = project?.systems?.find(s => s.id === id);
+        if (sys) {
+            setSystemToDelete({ id, name: sys.name });
+            setDeleteSystemConfirmOpen(true);
+        }
+    };
+
+    const confirmDeleteSystem = async () => {
+        if (!systemToDelete) return;
+        try {
+            await deleteSystem(projectId, systemToDelete.id);
+            setDeleteSystemConfirmOpen(false);
+            setSystemToDelete(null);
+            loadProjectStats(); // Re-fetch project to update list
+        } catch (e) {
+            console.error("Failed to delete system:", e);
+            alert("삭제 실패");
+        }
+    };
+
+    const handleSystemSave = async (sys: BuildingSystem) => {
+        try {
+            if (selectedSystem) {
+                await updateSystem(projectId, sys);
+            } else {
+                await addSystem(projectId, sys);
+            }
+            setViewMode("list");
+            loadProjectStats(); // Refresh project
+        } catch (e) {
+            console.error("Failed to save system:", e);
+        }
+    };
+
     if (viewMode === "form") {
         return (
             <div className="space-y-6 max-w-3xl mx-auto">
@@ -202,6 +279,7 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                         projectStats={projectStats}
                         projectVentilation={project?.ventilationConfig}
                         units={project?.ventilationUnits}
+                        systems={project?.systems}
                         renderEnvelope={() => (
                             selectedZone && selectedZone.id ? (
                                 <EnvelopeSection
@@ -218,6 +296,23 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                         )}
                     />
                 </div >
+            </div>
+        );
+    }
+
+    if (viewMode === "system-form") {
+        return (
+            <div className="space-y-6 max-w-3xl mx-auto">
+                <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className="mb-2">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> 시스템 목록으로 돌아가기
+                </Button>
+                <SystemForm
+                    projectId={projectId}
+                    system={selectedSystem}
+                    zones={zones}
+                    onSave={handleSystemSave}
+                    onCancel={() => setViewMode("list")}
+                />
             </div>
         );
     }
@@ -261,9 +356,9 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                 {project && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>프로젝트 환기 설정 (Ventilation Settings)</CardTitle>
+                            <CardTitle>외피 기밀성 및 침기 설정 (Air Tightness & Infiltration)</CardTitle>
                             <CardDescription>
-                                건물 전체에 적용되는 기밀 등급과 침기율(n50)을 설정합니다.
+                                건물 전체의 기밀 등급과 침기율(n50)을 설정합니다. 기계 환기 설비가 있는 경우 더 엄격한 기밀성이 요구됩니다.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -289,8 +384,8 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                                     <Select
                                         value={project.ventilationConfig?.infiltrationCategory || "I"}
                                         onValueChange={(val: "I" | "II" | "III" | "IV") => {
-                                            // Determine mode based on units presence
-                                            const hasMechanical = (project.ventilationUnits?.length ?? 0) > 0;
+                                            // Determine mode based on AHU system presence
+                                            const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
                                             const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
 
                                             const newN50 = project.ventilationConfig?.isMeasured
@@ -333,8 +428,8 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                                                 checked={project.ventilationConfig?.isMeasured || false}
                                                 onCheckedChange={(checked) => {
                                                     const isMeasured = checked === true;
-                                                    // Determine mode
-                                                    const hasMechanical = (project.ventilationUnits?.length ?? 0) > 0;
+                                                    // Determine mode based on AHU system presence
+                                                    const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
                                                     const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
 
                                                     const cat = project.ventilationConfig?.infiltrationCategory || "I";
@@ -464,9 +559,77 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
             </TabsContent>
 
             <TabsContent value="systems">
+                {/* Thermal Systems */}
+                <Card className="mb-6">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div className="space-y-1.5">
+                            <CardTitle>열원 및 설비 시스템 (Thermal Systems)</CardTitle>
+                            <CardDescription>
+                                난방, 냉방, 급탕(DHW) 및 태양광 시스템을 정의하고 존과 연결합니다.
+                            </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2 bg-muted p-1 rounded-md">
+                            <Button
+                                variant={!isSystemGraphMode ? "secondary" : "ghost"}
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={() => setIsSystemGraphMode(false)}
+                            >
+                                <LayoutList className="h-4 w-4 mr-1" /> 목록
+                            </Button>
+                            <Button
+                                variant={isSystemGraphMode ? "secondary" : "ghost"}
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={() => setIsSystemGraphMode(true)}
+                            >
+                                <Network className="h-4 w-4 mr-1" /> 다이어그램
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {isSystemGraphMode ? (
+                            <SystemGraphView
+                                systems={project?.systems || []}
+                                zones={zones}
+                            />
+                        ) : (
+                            <SystemList
+                                projectId={projectId}
+                                systems={project?.systems || []}
+                                onAdd={handleAddSystem}
+                                onEdit={handleEditSystem}
+                                onDelete={handleDeleteSystemClick}
+                            />
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Dialog open={deleteSystemConfirmOpen} onOpenChange={setDeleteSystemConfirmOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>설비 삭제 확인</DialogTitle>
+                            <DialogDescription>
+                                정말로 &apos;{systemToDelete?.name}&apos; 설비를 삭제하시겠습니까?
+                                이 작업은 되돌릴 수 없으며 존에 연결된 설비 정보가 해제됩니다.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="outline" onClick={() => setDeleteSystemConfirmOpen(false)}>
+                                취소
+                            </Button>
+                            <Button variant="destructive" onClick={confirmDeleteSystem}>
+                                삭제
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Mechanical Ventilation - Deprecated in favor of AHU Systems */}
+                {/* 
                 <Card>
                     <CardHeader>
-                        <CardTitle>공조 시스템 관리 (Mechanical Systems)</CardTitle>
+                        <CardTitle>기계 환기 장비 (Ventilation Units)</CardTitle>
                         <CardDescription>
                             공조기(AHU), 전열교환기(ERV) 등 주요 기계 환기 장비를 정의합니다.
                         </CardDescription>
@@ -480,7 +643,8 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                             />
                         )}
                     </CardContent>
-                </Card>
+                </Card> 
+                */}
             </TabsContent>
         </Tabs >
     );

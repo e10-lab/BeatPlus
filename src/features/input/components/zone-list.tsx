@@ -19,6 +19,14 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 // DnD Kit Imports
 import {
@@ -197,7 +205,7 @@ function SortableZoneCard({ zone, projectId, onEdit, onViewDetail, onDelete, onT
                         </div>
                         <div className="flex items-center gap-1.5" title="체적">
                             <Cuboid className="h-3.5 w-3.5" />
-                            <span>{zone.volume.toFixed(1)} m³</span>
+                            <span>{(zone.volume || 0).toFixed(1)} m³</span>
                         </div>
                     </div>
 
@@ -268,6 +276,8 @@ export function ZoneList({ projectId, onEdit, onViewDetail, refreshTrigger, onZo
     const [zones, setZones] = useState<Zone[]>([]);
     const [loading, setLoading] = useState(true);
     const [constructionMap, setConstructionMap] = useState<Record<string, string>>({});
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [zoneToDelete, setZoneToDelete] = useState<{ id: string; name: string } | null>(null);
 
     const fetchData = async () => {
         setLoading(true);
@@ -296,16 +306,25 @@ export function ZoneList({ projectId, onEdit, onViewDetail, refreshTrigger, onZo
         fetchData();
     }, [projectId, refreshTrigger]);
 
-    const handleDelete = async (zoneId: string) => {
-        if (confirm("정말로 이 존을 삭제하시겠습니까?")) {
-            try {
-                await deleteZone(projectId, zoneId);
-                fetchData(); // Refresh list
-                if (onZoneChange) onZoneChange();
-            } catch (error) {
-                console.error("Failed to delete zone:", error);
-                alert("삭제 실패");
-            }
+    const handleDeleteClick = (zoneId: string) => {
+        const zone = zones.find(z => z.id === zoneId);
+        if (zone) {
+            setZoneToDelete({ id: zoneId, name: zone.name });
+            setDeleteConfirmOpen(true);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!zoneToDelete) return;
+        try {
+            await deleteZone(projectId, zoneToDelete.id);
+            setDeleteConfirmOpen(false);
+            setZoneToDelete(null);
+            fetchData(); // Refresh list
+            if (onZoneChange) onZoneChange();
+        } catch (error) {
+            console.error("Failed to delete zone:", error);
+            alert("삭제 실패");
         }
     };
 
@@ -377,7 +396,7 @@ export function ZoneList({ projectId, onEdit, onViewDetail, refreshTrigger, onZo
                             projectId={projectId}
                             onEdit={onEdit}
                             onViewDetail={onViewDetail}
-                            onDelete={handleDelete}
+                            onDelete={handleDeleteClick}
                             onToggleExclusion={async (zone) => {
                                 if (zone.id) {
                                     const newValue = !zone.isExcluded;
@@ -407,6 +426,26 @@ export function ZoneList({ projectId, onEdit, onViewDetail, refreshTrigger, onZo
                     ))}
                 </div>
             </SortableContext>
+
+            <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>존 삭제 확인</DialogTitle>
+                        <DialogDescription>
+                            정말로 &apos;{zoneToDelete?.name}&apos; 존을 삭제하시겠습니까?
+                            이 작업은 되돌릴 수 없으며 존에 포함된 모든 표면(Surface) 정보가 함께 삭제됩니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                            취소
+                        </Button>
+                        <Button variant="destructive" onClick={confirmDelete}>
+                            삭제
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </DndContext>
     );
 }

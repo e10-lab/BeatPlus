@@ -10,7 +10,7 @@ import {
     orderBy,
     writeBatch
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, sanitizeData } from "@/lib/firebase";
 import { Zone } from "@/types/project";
 
 const PROJECTS_COLLECTION = "projects";
@@ -18,10 +18,10 @@ const ZONES_COLLECTION = "zones";
 
 export const createZone = async (projectId: string, zoneData: Omit<Zone, "id" | "projectId">) => {
     const zonesRef = collection(db, PROJECTS_COLLECTION, projectId, ZONES_COLLECTION);
-    const docRef = await addDoc(zonesRef, {
+    const docRef = await addDoc(zonesRef, sanitizeData({
         ...zoneData,
         projectId,
-    });
+    }));
     return docRef.id;
 };
 
@@ -46,7 +46,7 @@ export const getZones = async (projectId: string): Promise<Zone[]> => {
 
 export const updateZone = async (projectId: string, zoneId: string, zoneData: Partial<Zone>) => {
     const zoneRef = doc(db, PROJECTS_COLLECTION, projectId, ZONES_COLLECTION, zoneId);
-    await updateDoc(zoneRef, zoneData);
+    await updateDoc(zoneRef, sanitizeData(zoneData));
 };
 
 export const deleteZone = async (projectId: string, zoneId: string) => {

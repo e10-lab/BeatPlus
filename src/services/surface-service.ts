@@ -9,7 +9,7 @@ import {
     orderBy,
     writeBatch
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, sanitizeData } from "@/lib/firebase";
 import { Surface } from "@/types/project";
 
 const PROJECTS_COLLECTION = "projects";
@@ -23,10 +23,10 @@ const getSurfacesCollectionRef = (projectId: string, zoneId: string) => {
 
 export const createSurface = async (projectId: string, zoneId: string, surfaceData: Omit<Surface, "id" | "zoneId">) => {
     const surfacesRef = getSurfacesCollectionRef(projectId, zoneId);
-    const docRef = await addDoc(surfacesRef, {
+    const docRef = await addDoc(surfacesRef, sanitizeData({
         ...surfaceData,
         zoneId,
-    });
+    }));
     return docRef.id;
 };
 
@@ -51,7 +51,7 @@ export const getSurfaces = async (projectId: string, zoneId: string): Promise<Su
 
 export const updateSurface = async (projectId: string, zoneId: string, surfaceId: string, surfaceData: Partial<Surface>) => {
     const surfaceRef = doc(db, PROJECTS_COLLECTION, projectId, ZONES_COLLECTION, zoneId, SURFACES_COLLECTION, surfaceId);
-    await updateDoc(surfaceRef, surfaceData);
+    await updateDoc(surfaceRef, sanitizeData(surfaceData));
 };
 
 export const deleteSurface = async (projectId: string, zoneId: string, surfaceId: string) => {

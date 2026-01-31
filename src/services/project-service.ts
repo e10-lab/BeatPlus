@@ -10,17 +10,17 @@ import {
     where,
     Timestamp
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, sanitizeData } from "@/lib/firebase";
 import { Project } from "@/types/project";
 
 const PROJECTS_COLLECTION = "projects";
 
 export const createProject = async (projectData: Omit<Project, "id" | "createdAt" | "updatedAt">) => {
-    const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), {
+    const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), sanitizeData({
         ...projectData,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
-    });
+    }));
     return docRef.id;
 };
 
@@ -57,8 +57,12 @@ export const getProject = async (id: string): Promise<Project | null> => {
 
 export const updateProject = async (id: string, updates: Partial<Project>) => {
     const docRef = doc(db, PROJECTS_COLLECTION, id);
+
+    // Filter out undefined values to prevent Firestore errors
+    const sanitizedUpdates = sanitizeData(updates);
+
     await updateDoc(docRef, {
-        ...updates,
+        ...sanitizedUpdates,
         updatedAt: Timestamp.now(),
     });
 };

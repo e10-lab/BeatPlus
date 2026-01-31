@@ -29,8 +29,8 @@ export function EnergyBalanceChart({ data, totalArea }: EnergyBalanceChartProps)
                 <CardTitle>월별 에너지 밸런스 (Specific Balance)</CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[300px] min-h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={chartData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis

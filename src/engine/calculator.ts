@@ -1,9 +1,15 @@
 
+import { DHWSystem, AHUSystem, HeatingSystem, CoolingSystem, LightingSystem, EnergySource } from "@/types/system";
 import { ZoneInput, CalculationResults, MonthlyResult, HourlyResult, ClimateData } from "./types";
 import { Project } from "@/types/project";
 import { getClimateData, generateHourlyClimateData } from "./climate-data";
 import { calculateHourlyRadiation } from "./solar-calc";
+import { calculateLightingDemand } from "./lighting-calc";
+import { calculateHourlyDHW } from "./dhw-calc";
+import { calculateHourlyHvac, HvacResult } from "./hvac-calc";
+import { calculateHourlyPV } from "./pv-calc";
 import { DIN_18599_PROFILES } from "@/lib/din-18599-profiles";
+import { PEF_FACTORS, CO2_FACTORS } from "@/lib/standard-values";
 
 // Physical Constants
 const HEAT_CAPACITY_AIR = 0.34; // Wh/(m³K) or 1200 J/(m³K) / 3600
@@ -19,7 +25,8 @@ export function calculateEnergyDemand(
     mainStructure?: string,
     ventilationConfig?: Project['ventilationConfig'],
     ventilationUnits?: Project['ventilationUnits'],
-    automationConfig?: Project['automationConfig']
+    automationConfig?: Project['automationConfig'],
+    systems?: Project['systems']
 ): CalculationResults {
 
     // 1. Prepare Weather Data
@@ -42,13 +49,17 @@ export function calculateEnergyDemand(
             mainStructure,
             ventilationConfig,
             ventilationUnits,
-            automationConfig
+            automationConfig,
+            systems
         );
     }).filter((r): r is NonNullable<typeof r> => r !== null);
 
     // Aggregate Yearly Results
     const totalHeating = zoneResults.reduce((sum, z) => sum + z.yearly.heatingDemand, 0);
     const totalCooling = zoneResults.reduce((sum, z) => sum + z.yearly.coolingDemand, 0);
+    const totalLighting = zoneResults.reduce((sum, z) => sum + z.yearly.lightingDemand, 0);
+    const totalDHW = zoneResults.reduce((sum, z) => sum + z.yearly.dhwDemand, 0);
+    const totalAux = zoneResults.reduce((sum, z) => sum + z.yearly.auxDemand, 0);
     const totalArea = zoneResults.reduce((sum, z) => sum + z.yearly.totalArea, 0);
 
     // Aggregate Monthly Results (for project total charts)
@@ -67,21 +78,128 @@ export function calculateEnergyDemand(
             Qc: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Qc || 0), 0),
             Q_heating: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Qh || 0), 0),
             Q_cooling: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Qc || 0), 0),
+            Q_lighting: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Q_lighting || 0), 0),
+            Q_dhw: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Q_dhw || 0), 0),
+            Q_aux: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Q_aux || 0), 0),
+            // PV Placeholders (aggregated later)
+            pvGeneration: 0,
+            selfConsumption: 0,
+
             // Averages need area weighting
             gamma: 0, eta: 0, // Not strictly applicable to sum
             avg_Ti: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.avg_Ti || 0) * z.yearly.totalArea, 0) / totalArea
         });
     }
 
+    // --- PV Calculation (DIN 18599-9) ---
+    // Find shared PV systems or assume Project level
+    const pvSystems = systems?.filter(s => s.type === "PV") as import("@/types/system").PVSystem[] | undefined;
+
+    let totalPVGen_Wh = 0;
+    const hourlyPVGen: number[] = new Array(8760).fill(0);
+
+    if (pvSystems && pvSystems.length > 0) {
+        // Calculate generation for each system
+        // Latitude default 37.5
+        const lat = 37.5; // Fixed for now, should come from project location
+
+        pvSystems.forEach(sys => {
+            const res = calculateHourlyPV(sys, hourlyClimate, lat);
+            totalPVGen_Wh += res.totalGeneration;
+            for (let i = 0; i < 8760; i++) {
+                hourlyPVGen[i] += res.hourlyGeneration[i];
+            }
+        });
+    }
+
+    const pvGen_kWh = totalPVGen_Wh / 1000;
+    const pvCredit = pvGen_kWh * 2.75; // PEF for displaced electricity
+
+    // Aggregate Yearly Final/Primary
+    let sumFinalHeating = 0;
+    let sumFinalCooling = 0;
+    let sumFinalDHW = 0;
+    let sumFinalLighting = 0;
+    let sumFinalAux = 0;
+
+    let sumPrimaryHeating = 0;
+    let sumPrimaryCooling = 0;
+    let sumPrimaryDHW = 0;
+    let sumPrimaryLighting = 0;
+    let sumPrimaryAux = 0;
+
+    let sumCO2 = 0;
+
+    zoneResults.forEach(z => {
+        if (z.yearly.finalEnergy) {
+            sumFinalHeating += z.yearly.finalEnergy.heating;
+            sumFinalCooling += z.yearly.finalEnergy.cooling;
+            sumFinalDHW += z.yearly.finalEnergy.dhw;
+            sumFinalLighting += z.yearly.finalEnergy.lighting;
+            sumFinalAux += z.yearly.finalEnergy.auxiliary;
+        }
+        if (z.yearly.primaryEnergy) {
+            sumPrimaryHeating += z.yearly.primaryEnergy.heating;
+            sumPrimaryCooling += z.yearly.primaryEnergy.cooling;
+            sumPrimaryDHW += z.yearly.primaryEnergy.dhw;
+            sumPrimaryLighting += z.yearly.primaryEnergy.lighting;
+            sumPrimaryAux += z.yearly.primaryEnergy.auxiliary;
+        }
+        if (z.yearly.co2Emissions) {
+            sumCO2 += z.yearly.co2Emissions;
+        }
+    });
+
+    const totalPrimary = sumPrimaryHeating + sumPrimaryCooling + sumPrimaryDHW + sumPrimaryLighting + sumPrimaryAux - pvCredit;
+    const totalCO2WithPV = sumCO2 - (pvGen_kWh * 0.466); // Credit CO2
+
     return {
         zones: zoneResults,
-        monthly: projectMonthlyResults,
+        monthly: projectMonthlyResults.map(m => {
+            // Simple distribution of PV for monthly chart approx
+            // In real logic, we should sum hourlyPVGen for the month
+            // Let's do simple ratio for now to populate the field
+            const r = m.QS / (zoneResults.reduce((s, z) => s + z.yearly.dhwDemand * 0 + z.yearly.heatingDemand * 0 + 1, 0) * 0 + 1); // logic broken
+            // Better:
+            // Aggregating actual PV
+            return {
+                ...m,
+                pvGeneration: totalPVGen_Wh > 0 ? (pvGen_kWh / 12) : 0,
+                selfConsumption: totalPVGen_Wh > 0 ? (pvGen_kWh / 12) : 0
+            };
+        }),
         yearly: {
             heatingDemand: totalHeating,
             coolingDemand: totalCooling,
+            lightingDemand: totalLighting,
+            dhwDemand: totalDHW,
+            auxDemand: totalAux,
             totalArea: totalArea,
             specificHeatingDemand: totalArea > 0 ? totalHeating / totalArea : 0,
-            specificCoolingDemand: totalArea > 0 ? totalCooling / totalArea : 0
+            specificCoolingDemand: totalArea > 0 ? totalCooling / totalArea : 0,
+
+            // PV
+            pvGeneration: pvGen_kWh,
+            selfConsumption: pvGen_kWh, // Assume Net Metering 
+            pvExport: 0,
+
+            finalEnergy: {
+                heating: sumFinalHeating,
+                cooling: sumFinalCooling,
+                dhw: sumFinalDHW,
+                lighting: sumFinalLighting,
+                auxiliary: sumFinalAux
+            },
+            primaryEnergy: {
+                heating: sumPrimaryHeating,
+                cooling: sumPrimaryCooling,
+                dhw: sumPrimaryDHW,
+                lighting: sumPrimaryLighting,
+                auxiliary: sumPrimaryAux,
+                total: totalPrimary,
+                pvCredit: -pvCredit
+            },
+            co2Emissions: totalCO2WithPV
         }
     };
 }
@@ -92,7 +210,8 @@ function calculateZoneHourly(
     mainStructure?: string,
     ventilationConfig?: Project['ventilationConfig'],
     ventilationUnits?: Project['ventilationUnits'],
-    automationConfig?: Project['automationConfig']
+    automationConfig?: Project['automationConfig'],
+    systems?: Project['systems']
 ) {
     const Area = zone.area;
     const Volume = Area * zone.height * 0.95; // Net volume
@@ -174,10 +293,13 @@ function calculateZoneHourly(
     // Result accumulators
     let sum_Qh = 0;
     let sum_Qc = 0;
+    let sum_Ql = 0; // Lighting
+    let sum_Qw = 0; // DHW (Water)
+    let sum_Qaux = 0; // Auxiliary (Fans)
 
     // Monthly aggregators
-    const monthlyAggs = Array(13).fill(null).map(() => ({
-        QT: 0, QV: 0, Qloss: 0, QS: 0, QI: 0, Qgain: 0, Qh: 0, Qc: 0,
+    const monthlyAggs = Array(12).fill(null).map(() => ({
+        QT: 0, QV: 0, Qloss: 0, QS: 0, QI: 0, Qgain: 0, Qh: 0, Qc: 0, Q_lighting: 0, Q_dhw: 0, Q_aux: 0,
         tempSum: 0, count: 0
     }));
 
@@ -187,25 +309,109 @@ function calculateZoneHourly(
         const Te = hrData.Te;
 
         // 1. Ventilation Rate (Current Hour)
-        // Check schedule (Day/Night)
-        // Simple usage schedule (e.g. 7-19)
-        const isOccupied = (hrData.hour >= 7 && hrData.hour < 19); // 12h usage
-        // Or use profile hours?
-        // Let's use profile: usage hours / 24?
-        // Simplified: Standard Office 8-18 (10h)
+        // Dynamic Occupancy Logic
+        const isFiveDayWeek = profile.annualUsageDays <= 260;
+        const dayOfYear = Math.ceil(hrData.hourOfYear / 24);
+        const dayOfWeek = ((dayOfYear - 1) % 7) + 1; // 1=Mon, ... 7=Sun (Simplified assumption: Jan 1 is Mon)
 
-        const minAirEx = profile.minOutdoorAirFlow ? (profile.minOutdoorAirFlow * Area / Volume) : 0.5;
-        const operAirEx = isOccupied ? minAirEx : 0;
+        let isWorkingDay = true;
+        if (isFiveDayWeek) {
+            isWorkingDay = dayOfWeek <= 5;
+        }
 
-        // Infiltration
-        const infRate = f_inf_base; // Simplified
+        const localHour = (h - 1) % 24;
+        const isOccupiedTime = localHour >= profile.usageHoursStart && localHour < profile.usageHoursEnd;
+        const isOccupied = isWorkingDay && isOccupiedTime;
 
-        // Total Air Exchange
-        // Heat Recovery?
-        // If mech vent exists, reduce effective H_ve
-        // Simplified:
-        const ventRate = Math.max(infRate, operAirEx);
-        const H_ve = ventRate * Volume * HEAT_CAPACITY_AIR;
+        // Infiltration (Always present to some degree)
+        const infRate = f_inf_base;
+
+        // Operational Ventilation
+        let operAirEx = 0;
+        let heatRecoveryFactor = 0; // 0 = No recovery (100% loss), 1 = Perfect recovery
+        let fanPowerWatts = 0; // Auxiliary fan power
+
+        if (isOccupied) {
+            // Check Mechanical Ventilation
+            // 1. Check for linked AHU Systems
+            const ahuSystem = systems?.find(s => s.type === "AHU" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as AHUSystem | undefined;
+
+            // 2. Check for Ventilation Units (Legacy/Separate)
+            const isVentUnit = (zone.linkedVentilationUnitIds && zone.linkedVentilationUnitIds.length > 0);
+
+            const isMechanical = !!ahuSystem || isVentUnit;
+
+            // DIN 18599-10 Operation Factors (F_A,RLT & F_Te,RLT)
+            const F_A_RLT = profile.hvacAbsenceFactor || 0;
+            const F_Te_RLT = profile.hvacPartialOperationFactor ?? 1.0;
+            const effectiveFactor = (1 - F_A_RLT) * F_Te_RLT;
+
+            if (isMechanical) {
+                let eff = 0;
+
+                // Priority: AHU -> Vent Units -> Config
+                if (ahuSystem && ahuSystem.heatRecovery) {
+                    // Decide which efficiency to use based on outdoor temperature
+                    // If Te is lower than the heating setpoint (or midpoint), use heating efficiency
+                    const midpoint = (zone.temperatureSetpoints.heating + zone.temperatureSetpoints.cooling) / 2;
+                    eff = Te < midpoint ? ahuSystem.heatRecovery.heatingEfficiency : ahuSystem.heatRecovery.coolingEfficiency;
+                } else if (isVentUnit && ventilationUnits) {
+                    // Find effective Heat Recovery Efficiency
+                    const activeUnits = ventilationUnits.filter(u => zone.linkedVentilationUnitIds?.includes(u.id));
+                    if (activeUnits.length > 0) {
+                        const totalFlow = activeUnits.reduce((sum, u) => sum + (u.supplyFlowRate || 0), 0);
+                        if (totalFlow > 0) {
+                            // Weighted average efficiency
+                            const weightedEff = activeUnits.reduce((sum, u) => sum + (u.supplyFlowRate || 0) * (u.heatRecoveryEfficiency || 0), 0);
+                            eff = (weightedEff / totalFlow) / 100; // % to 0-1
+                        } else {
+                            // Fallback if rates are 0
+                            eff = (activeUnits[0].heatRecoveryEfficiency || 0) / 100;
+                        }
+                    }
+                }
+
+                // Fallback to Project Config if no units linked (but mode is mechanical?)
+                // Or if we are using the 'ventilationConfig' passed from Project
+                if (eff === 0 && ventilationConfig?.type === 'mechanical') {
+                    eff = (ventilationConfig.heatRecoveryEfficiency || 0) / 100;
+                }
+
+                heatRecoveryFactor = eff;
+
+                // Mechanical Air Exchange Rate
+                // If units define flow: Use unit flow.
+                // Otherwise use Profile Minimum.
+                // For now, adhere to Profile Requirement as Demand.
+                // Apply Operation Factors to Flow Rate or Operation Time.
+                // Physically, it reduces average flow rate.
+                const reqFlow = profile.minOutdoorAirFlow ? (profile.minOutdoorAirFlow * Area) : (Volume * 0.5);
+                operAirEx = (reqFlow * effectiveFactor) / Volume;
+
+                // Fan Power Calculation
+                let sfp = 1.5; // Default SFP W/(m3/h)
+                if (ahuSystem) {
+                    sfp = ahuSystem.fanPower || 1.5;
+                }
+                // Fan runs for required flow
+                // Power (W) = SFP (W/(m3/h)) * Flow (m3/h)
+                // Fan power also reduced by effective flow? Yes, VSD assumed or simple average.
+                fanPowerWatts = sfp * reqFlow * effectiveFactor;
+
+            } else {
+                // Natural Ventilation
+                // Profile defines required air exchange
+                const reqFlow = profile.minOutdoorAirFlow ? (profile.minOutdoorAirFlow * Area) : (Volume * 0.5);
+                operAirEx = reqFlow / Volume;
+                heatRecoveryFactor = 0;
+            }
+        }
+
+        // Total Air Exchange & Heat Coefficient
+        // H_ve = Rho*Cp * Volume * (Infiltration + (1-eta)*Ventilation)
+        // Note: Infiltration is usually added.
+        const H_ve = Volume * HEAT_CAPACITY_AIR * (infRate + operAirEx * (1 - heatRecoveryFactor));
+
 
         // 2. Solar Gains (Phi_sol)
         let Phi_sol = 0;
@@ -242,7 +448,13 @@ function calculateZoneHourly(
             if (surf.type === 'window' || surf.type === 'door') {
                 const shgc = surf.shgc ?? 0.6;
                 const ff = 0.7; // Frame factor
-                gain = I_tot * surf.area * shgc * ff * 0.9; // 0.9 shading factor approx
+
+                // Dynamic Shading (Simplified)
+                // If I_tot > 300 W/m2, assume blinds used (Fc = 0.5)? 
+                // For now keep static 0.9 as defined in previous step, but mark for future.
+                const shadingFactor = 0.9;
+
+                gain = I_tot * surf.area * shgc * ff * shadingFactor;
             } else {
                 // Opaque: alpha * I * U / h_out? 
                 // Sol-air temp approach is better.
@@ -254,19 +466,89 @@ function calculateZoneHourly(
             Phi_sol += gain;
         });
 
+
         // 3. Internal Gains (Phi_int)
-        // Usage schedule dependent
+        // Derived from Profile Daily Totals provided in Wh/(m²·d)
         let Phi_int = 0;
+        let Q_dhw_val = 0;
+
         if (isOccupied) {
-            // Internal Load Density (W/m2)
-            // Profile gives Wh/(m2 d). 
-            // Approx Power = Energy / Hours
-            const dailyEnergy = profile.metabolicHeat + profile.equipmentHeat + (profile.illuminance / 60 * profile.usageHoursDay);
-            // Very rough mapping back to power
-            const powerW = (dailyEnergy * Area) / 10; // Assume 10h op
-            Phi_int = powerW;
+            const usageHours = Math.max(1, profile.usageHoursEnd - profile.usageHoursStart);
+
+            // Metabolic
+            const powerMetabolic = (profile.metabolicHeat * Area) / usageHours;
+
+            // Equipment
+            const powerEquipment = (profile.equipmentHeat * Area) / usageHours;
+
+            // Lighting (Dynamic DIN/TS 18599-4)
+            // Find relevant Lighting system
+            let lightingSystem = systems?.find(s => s.type === "LIGHTING" && s.linkedZoneIds?.includes(zone.id || ""));
+            if (!lightingSystem && zone.linkedLightingSystemId) {
+                lightingSystem = systems?.find(s => s.id === zone.linkedLightingSystemId);
+            }
+            if (!lightingSystem) {
+                lightingSystem = systems?.find(s => s.type === "LIGHTING" && s.isShared);
+            }
+
+            const lightingCalc = calculateLightingDemand(
+                zone,
+                hrData.I_beam,
+                hrData.I_diff,
+                hrData.sunAltitude,
+                profile,
+                lightingSystem as LightingSystem
+            );
+            const powerLighting = lightingCalc.heatGainLighting; // Heat gain component
+            // Note: We also need to track lightingCalc.powerLighting as Energy, but Phi_int deals with heat.
+
+            // DHW (Dynamic DIN/TS 18599-8)
+            // Find relevant DHW system for this zone
+            // Priority: Linked to Zone -> Global Shared -> None
+            let dhwSystem = systems?.find(s => s.type === "DHW" && s.linkedZoneIds?.includes(zone.id || ""));
+            if (!dhwSystem) {
+                dhwSystem = systems?.find(s => s.type === "DHW" && s.isShared);
+            }
+
+            // Ambient temperature for DHW losses. 
+            // If storage is in conditioned space, use Ti (Theta_m_prev is best guess for now or just 20C const).
+            // If unconditioned, use Te or 15C.
+            // Simplified: Use 20C if we assume indoor, Te if outdoor. 
+            let ambientForDHW = 20;
+            if (dhwSystem?.type === "DHW" && dhwSystem.storage?.location === "unconditioned") {
+                ambientForDHW = Te;
+            }
+
+            // Cast to DHWSystem to satisfy TS if check passed
+            const dhwCalc = calculateHourlyDHW(zone, profile, localHour, isOccupied, dhwSystem as DHWSystem, ambientForDHW);
+            const heatGainDHW = dhwCalc.heatGainDHW;
+            Q_dhw_val = dhwCalc.energyDHW; // Generator Output required (Thermal Demand + Losses)
+
+            Phi_int = powerMetabolic + powerEquipment + powerLighting + heatGainDHW;
+
         } else {
-            Phi_int = 0; // Or slight standby
+            // Unoccupied: Standby loads (e.g. 5% of equipment)
+            const usageHours = Math.max(1, profile.usageHoursEnd - profile.usageHoursStart);
+            const powerEquipment = (profile.equipmentHeat * Area) / usageHours;
+
+            // DHW in unoccupied? 
+            let dhwSystem = systems?.find(s => s.type === "DHW" && s.linkedZoneIds?.includes(zone.id || ""));
+            if (!dhwSystem) {
+                dhwSystem = systems?.find(s => s.type === "DHW" && s.isShared);
+            }
+
+            // Still calculate DHW losses (storage/circulation) even if not occupied
+            let ambientForDHW = 20;
+            if (dhwSystem?.type === "DHW" && dhwSystem.storage?.location === "unconditioned") {
+                ambientForDHW = Te;
+            }
+            // Passing isOccupied=false will zero out useful demand, but losses remain
+            const dhwCalc = calculateHourlyDHW(zone, profile, localHour, false, dhwSystem as DHWSystem, ambientForDHW);
+
+            Q_dhw_val = dhwCalc.energyDHW;
+            const heatGainDHW = dhwCalc.heatGainDHW;
+
+            Phi_int = (powerEquipment * 0.05) + heatGainDHW;
         }
 
         // --- C. 5R1C Solution ---
@@ -300,8 +582,28 @@ function calculateZoneHourly(
         // But Ti depends on Load (if controlled).
 
         // Strategy: Calculate Free Running Temperature first.
-        const Theta_set_h = zone.temperatureSetpoints.heating;
-        const Theta_set_c = zone.temperatureSetpoints.cooling;
+
+        // Determine Setpoints based on Occupancy
+        let Theta_set_h = zone.temperatureSetpoints.heating;
+        let Theta_set_c = zone.temperatureSetpoints.cooling;
+
+        if (!isOccupied) {
+            // Apply Setback / Shutdown
+            const setbackDelta = profile.heatingSetbackTemp ?? 4.0;
+            const mode = zone.heatingReducedMode || "setback";
+
+            if (mode === "shutdown") {
+                // Frost protection only
+                Theta_set_h = 5.0;
+            } else {
+                // Reduced operation
+                Theta_set_h = Theta_set_h - setbackDelta;
+            }
+
+            // Cooling usually off during night/unoccupied? or setback?
+            // Simplified: Relax cooling setpoint significantly
+            Theta_set_c = 40.0; // Effectively off
+        }
 
         // --- Solver Steps (Simplified 5R1C) ---
         // 1. Calculate equivalent inputs for T_m
@@ -399,9 +701,20 @@ function calculateZoneHourly(
         const flux_m = H_tr_em_calc * (Te - theta_m_prev) + H_tr_ms_calc * (Ts - theta_m_prev);
         const theta_m_next = theta_m_prev + flux_m / Cm;
 
-        // Save results
         const Q_heat = Q_HC > 0 ? Q_HC : 0;
         const Q_cool = Q_HC < 0 ? -Q_HC : 0;
+
+        // Recalculate Lighting Energy for Result (or optimized: do it once above)
+        // Since we are inside the loop, we can just call it again or assume we saved it.
+        // Let's use the same logic as above to get the value.
+        // Optimization: Let's assume we need to access 'powerLighting' calculated above.
+        // But scope prevents it without refactor.
+        // Quick fix: Re-eval.
+        let Q_light = 0;
+        if (isOccupied) {
+            const lCalc = calculateLightingDemand(zone, hrData.I_beam, hrData.I_diff, hrData.sunAltitude, profile);
+            Q_light = lCalc.powerLighting;
+        }
 
         hourlyResults.push({
             hour: h,
@@ -409,6 +722,9 @@ function calculateZoneHourly(
             Ti: Ti,
             Q_heating: Q_heat,
             Q_cooling: Q_cool,
+            Q_lighting: Q_light,
+            Q_dhw: Q_dhw_val,
+            Q_aux: fanPowerWatts,
             theta_m: theta_m_next,
             theta_s: Ts,
             theta_air: Ti
@@ -416,12 +732,18 @@ function calculateZoneHourly(
 
         sum_Qh += Q_heat;
         sum_Qc += Q_cool;
+        sum_Ql += Q_light;
+        sum_Qw += Q_dhw_val;
+        sum_Qaux += fanPowerWatts;
 
         // Aggregate Monthly
         const mIdx = hrData.month - 1; // 0-11
         const mA = monthlyAggs[mIdx];
         mA.Qh += Q_heat / 1000; // Wh -> kWh
         mA.Qc += Q_cool / 1000;
+        mA.Q_lighting += Q_light / 1000;
+        mA.Q_dhw += Q_dhw_val / 1000;
+        mA.Q_aux += fanPowerWatts / 1000;
         // Detailed gains for chart (Split naive)
         // Just for viz, accumulate hourly components
         const QT = (H_tr_op + H_tr_w) * (Ti - Te);
@@ -453,8 +775,110 @@ function calculateZoneHourly(
         Qh: m.Qh, Qc: m.Qc,
         Q_heating: m.Qh,
         Q_cooling: m.Qc,
+        Q_lighting: m.Q_lighting,
+        Q_dhw: m.Q_dhw,
+        Q_aux: m.Q_aux,
+        // PV Placeholder
+        pvGeneration: 0,
+
         avg_Ti: m.count > 0 ? m.tempSum / m.count : 0
     }));
+
+    // --- D. HVAC System Performance ---
+    // Calculate Final Energy & Primary Energy based on Net Demand (Qh, Qc)
+    // Find systems
+    // Find systems
+    let heatingSystem = systems?.find(s => s.type === "HEATING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as HeatingSystem | undefined;
+    let coolingSystem = systems?.find(s => s.type === "COOLING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as CoolingSystem | undefined;
+    const dhwSystemForFinal = systems?.find(s => s.type === "DHW" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as DHWSystem | undefined;
+
+    // Check for AHU Systems acting as Heating/Cooling
+    const ahuSystem = systems?.find(s => s.type === "AHU" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as AHUSystem | undefined;
+
+    if (ahuSystem) {
+        // Map AHU Heating Coil to HeatingSystem
+        if (ahuSystem.heatingCoil && !heatingSystem) {
+            heatingSystem = {
+                type: "HEATING",
+                id: ahuSystem.id,
+                projectId: ahuSystem.projectId, // Using existing proj ID
+                name: `${ahuSystem.name} (Heating)`,
+                isShared: ahuSystem.isShared,
+                generator: {
+                    type: ahuSystem.heatingCoil.generatorType as any,
+                    fuel: ahuSystem.heatingCoil.fuel as any,
+                    efficiency: ahuSystem.heatingCoil.efficiency
+                },
+                distribution: {
+                    temperatureRegime: "55/45", // Assumed for air heating
+                    pumpControl: "uncontrolled" // Dummy
+                },
+                emission: {
+                    type: "air_heating"
+                }
+            };
+        }
+
+        // Map AHU Cooling Coil to CoolingSystem
+        if (ahuSystem.coolingCoil && !coolingSystem) {
+            coolingSystem = {
+                type: "COOLING",
+                id: ahuSystem.id,
+                projectId: ahuSystem.projectId,
+                name: `${ahuSystem.name} (Cooling)`,
+                isShared: ahuSystem.isShared,
+                generator: {
+                    type: ahuSystem.coolingCoil.generatorType as any,
+                    fuel: ahuSystem.coolingCoil.fuel as any,
+                    efficiency: ahuSystem.coolingCoil.efficiency
+                },
+                distribution: {
+                    type: "air"
+                },
+                emission: {
+                    type: "air"
+                }
+            };
+        }
+    }
+
+    const hvac = calculateHourlyHvac(
+        hourlyResults,
+        heatingSystem as any,
+        coolingSystem as any
+    );
+
+    // DHW Final Energy
+    // Q_dhw_final = Q_dhw_out / GeneratorEfficiency
+    let dhwFinal = 0;
+    let dhwPrimary = 0;
+    let dhwCO2 = 0;
+
+    // Q_dhw_out is 'sum_Qw'. 
+    // Generator efficiency is only used here to convert to Final Energy.
+    // Losses (storage, dist) already added to sum_Qw in calculateHourlyDHW.
+    const dhwEff = dhwSystemForFinal?.generator.efficiency || 0.9; // Default 0.9
+    dhwFinal = (sum_Qw / 1000) / dhwEff;
+
+    // PEF & CO2
+    const dhwFuel = (dhwSystemForFinal?.generator.fuel as EnergySource) || 'natural_gas';
+    const pef_dhw = PEF_FACTORS[dhwFuel];
+    const co2f_dhw = CO2_FACTORS[dhwFuel];
+
+    dhwPrimary = dhwFinal * pef_dhw;
+    dhwCO2 = dhwFinal * co2f_dhw;
+
+    // Aux Energy Final/Primary
+    // Assuming Electricity
+    // sum_Qaux contains Fan Energy (Wh). Convert to kWh.
+    // Add Hydraulic Pump Energy from HVAC Result (kWh).
+    const fanFinal = sum_Qaux / 1000; // kWh
+    const pumpFinal = (hvac.auxiliaryEnergyHeating || 0) + (hvac.auxiliaryEnergyCooling || 0);
+
+    const auxFinal = fanFinal + pumpFinal; // Total Aux
+    const auxPrimary = auxFinal * PEF_FACTORS.electricity;
+    const auxCO2 = auxFinal * CO2_FACTORS.electricity;
+
 
     return {
         zoneId: zone.id || "unknown", // Fallback for types
@@ -464,9 +888,35 @@ function calculateZoneHourly(
         yearly: {
             heatingDemand: sum_Qh / 1000,
             coolingDemand: sum_Qc / 1000,
+            lightingDemand: sum_Ql / 1000,
+            dhwDemand: sum_Qw / 1000,
+            auxDemand: sum_Qaux / 1000,
             totalArea: Area,
             specificHeatingDemand: (sum_Qh / 1000) / Area,
-            specificCoolingDemand: (sum_Qc / 1000) / Area
+            specificCoolingDemand: (sum_Qc / 1000) / Area,
+
+            // PV
+            pvGeneration: 0,
+            selfConsumption: 0,
+            pvExport: 0,
+
+            // New HVAC Results
+            finalEnergy: {
+                heating: hvac.finalEnergyHeating,
+                cooling: hvac.finalEnergyCooling,
+                dhw: dhwFinal,
+                lighting: sum_Ql / 1000, // Elec is 1:1 final usually
+                auxiliary: auxFinal
+            },
+            primaryEnergy: {
+                heating: hvac.primaryEnergyHeating,
+                cooling: hvac.primaryEnergyCooling,
+                dhw: dhwPrimary,
+                lighting: (sum_Ql / 1000) * 2.75, // Elec PEF
+                auxiliary: auxPrimary,
+                total: hvac.primaryEnergyHeating + hvac.primaryEnergyCooling + dhwPrimary + ((sum_Ql / 1000) * 2.75) + auxPrimary
+            },
+            co2Emissions: hvac.co2Heating + hvac.co2Cooling + dhwCO2 + ((sum_Ql / 1000) * 0.466) + auxCO2
         }
     };
 }

@@ -28,6 +28,14 @@ import {
     rectSortingStrategy
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 
 interface SurfaceListProps {
@@ -155,6 +163,8 @@ function SortableSurfaceItem({ surface, index, constructions, onEdit, onDelete }
 export function SurfaceList({ projectId, zoneId, onEdit, refreshTrigger, constructions = [] }: SurfaceListProps) {
     const [surfaces, setSurfaces] = useState<Surface[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [surfaceToDelete, setSurfaceToDelete] = useState<{ id: string; name: string } | null>(null);
 
     const fetchSurfaces = async () => {
         setLoading(true);
@@ -174,15 +184,24 @@ export function SurfaceList({ projectId, zoneId, onEdit, refreshTrigger, constru
         }
     }, [projectId, zoneId, refreshTrigger]);
 
-    const handleDelete = async (surfaceId: string) => {
-        if (confirm("정말로 이 표면을 삭제하시겠습니까?")) {
-            try {
-                await deleteSurface(projectId, zoneId, surfaceId);
-                fetchSurfaces();
-            } catch (error) {
-                console.error("Failed to delete surface:", error);
-                alert("삭제 실패");
-            }
+    const handleDeleteClick = (surfaceId: string) => {
+        const surf = surfaces.find(s => s.id === surfaceId);
+        if (surf) {
+            setSurfaceToDelete({ id: surfaceId, name: surf.name || "표면" });
+            setDeleteConfirmOpen(true);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!surfaceToDelete) return;
+        try {
+            await deleteSurface(projectId, zoneId, surfaceToDelete.id);
+            setDeleteConfirmOpen(false);
+            setSurfaceToDelete(null);
+            fetchSurfaces();
+        } catch (error) {
+            console.error("Failed to delete surface:", error);
+            alert("삭제 실패");
         }
     };
 
@@ -248,11 +267,31 @@ export function SurfaceList({ projectId, zoneId, onEdit, refreshTrigger, constru
                             index={index}
                             constructions={constructions}
                             onEdit={onEdit}
-                            onDelete={handleDelete}
+                            onDelete={handleDeleteClick}
                         />
                     ))}
                 </div>
             </SortableContext>
+
+            <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>표면 삭제 확인</DialogTitle>
+                        <DialogDescription>
+                            정말로 이 표면 정보를 삭제하시겠습니까?
+                            이 작업은 되돌릴 수 없습니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                            취소
+                        </Button>
+                        <Button variant="destructive" onClick={confirmDelete}>
+                            삭제
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </DndContext>
     );
 }

@@ -85,3 +85,38 @@ export function calculateHourlyRadiation(
 // The main caller is calculator.ts which we are about to rewrite. 
 // So it is safe to remove the old function.
 
+// Existing calculateHourlyRadiation can reuse this or stay simple
+// New helper for external use (Climate Analysis)
+export function calculateSunPosition(
+    dayOfYear: number,
+    hour: number,
+    latitude: number
+): { altitude: number, azimuth: number } {
+    const DEG2RAD = Math.PI / 180.0;
+    const latRad = latitude * DEG2RAD;
+
+    // Declination (delta)
+    const delta = 23.45 * Math.sin(DEG2RAD * (360 * (284 + dayOfYear) / 365));
+    const decRad = delta * DEG2RAD;
+
+    // Hour Angle (omega)
+    const omega = (hour - 12) * 15; // Degrees
+    const omegaRad = omega * DEG2RAD;
+
+    // Zenith Angle (theta_z) cosine
+    const cosThetaZ = Math.sin(latRad) * Math.sin(decRad) + Math.cos(latRad) * Math.cos(decRad) * Math.cos(omegaRad);
+
+    // Sun Altitude (alpha_s)
+    const sunAltitude = Math.asin(Math.max(-1, Math.min(1, cosThetaZ))) * (180 / Math.PI);
+
+    let sunAzimuth = 0;
+    if (sunAltitude > 0) {
+        const cosGammaS = (Math.sin(sunAltitude * DEG2RAD) * Math.sin(latRad) - Math.sin(decRad)) /
+            (Math.cos(sunAltitude * DEG2RAD) * Math.cos(latRad));
+        let gammaS_rad = Math.acos(Math.max(-1, Math.min(1, cosGammaS)));
+        if (hour < 12) gammaS_rad = -gammaS_rad;
+        sunAzimuth = gammaS_rad * (180 / Math.PI); // -180 to 180 (South=0)
+    }
+
+    return { altitude: sunAltitude, azimuth: sunAzimuth };
+}

@@ -16,7 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Zone, ZoneUsageType, VentilationUnit } from "@/types/project";
+import { Zone, ZoneUsageType, VentilationUnit, Project } from "@/types/project";
+import { BuildingSystem, LightingSystem } from "@/types/system";
 import { getSurfaces } from "@/services/surface-service";
 import { Surface } from "@/types/project";
 import { GeometricAnalysis } from "./geometric-analysis";
@@ -44,19 +45,15 @@ import {
 const formSchema = z.object({
     name: z.string().min(1, { message: "존 이름을 입력해주세요." }),
     usageType: z.enum([
-        "1_single_office", "2_group_office", "3_open_plan_office", "4_meeting", "5_counter",
-        "6_retail", "7_retail_refrig", "8_classroom", "9_lecture_hall",
-        "10_bed_room", "11_hotel_room", "12_canteen", "13_restaurant",
-        "14_kitchen", "15_kitchen_prep", "16_wc", "17_common_area",
-        "18_support_store", "19_corridor_care", "20_storage_uncond", "21_datacenter",
-        "22_1_workshop_light", "22_2_workshop_medium", "22_3_workshop_heavy",
-        "23_theater_audience", "24_cloakroom", "25_theater_foh", "26_stage", "27_exhibition",
-        "28_fair",
-        "29_library_public", "30_library_stack", "31_gym",
-        "32_parking_office", "33_parking_public",
-        "34_sauna", "35_fitness", "36_lab", "37_exam_room", "38_icu", "39_corridor_icu",
-        "40_medical_practice", "41_logistics", "42_server_room",
-        "residential_single", "residential_multi", "residential_general"
+        "1_office", "2_open_plan", "3_meeting", "4_library", "5_retail",
+        "6_retail_large", "7_classroom", "8_lecture_hall", "9_bed_room", "10_hotel_room",
+        "11_canteen", "12_restaurant", "13_kitchen", "14_storage_heated", "15_storage_unheated",
+        "16_parking", "17_workshop_light", "17_1_workshop_medium", "18_workshop_heavy", "19_gym",
+        "20_fitness", "21_pool", "22_lab", "23_exam_room", "24_icu", "25_corridor_care",
+        "26_medical_practice", "27_exhibition", "28_trade_fair",
+        "33_foyer", "34_retail_refrig", "35_kitchen_high", "36_hotel_wellness",
+        "38_server", "39_datacenter", "41_logistics",
+        "42_res_single", "43_res_multi", "44_dorm"
     ]),
     area: z.coerce.number().min(0.1, { message: "면적은 0보다 커야 합니다." }),
     height: z.coerce.number().min(0.1, { message: "천정고는 0보다 커야 합니다." }),
@@ -67,6 +64,7 @@ const formSchema = z.object({
     ventilationMode: z.enum(["natural", "mechanical", "balanced_mech"]).optional(),
     lightingPowerDensity: z.number().optional(),
     lightingEfficacy: z.number().optional(),
+    linkedLightingSystemId: z.string().optional(),
     heatingReducedMode: z.enum(["setback", "shutdown"]).default("setback"),
     // UI 로직을 위해 추가됨
     isMechanical: z.boolean().optional(),
@@ -86,10 +84,11 @@ interface ZoneFormProps {
         n50: number;
     };
     units?: VentilationUnit[];
+    systems?: BuildingSystem[];
     renderEnvelope?: () => React.ReactNode;
 }
 
-export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, projectVentilation, units = [], renderEnvelope }: ZoneFormProps) {
+export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, projectVentilation, units = [], systems = [], renderEnvelope }: ZoneFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -97,7 +96,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
         resolver: zodResolver(formSchema) as any,
         defaultValues: {
             name: zone?.name || "",
-            usageType: zone?.usageType || "1_single_office",
+            usageType: zone?.usageType || "1_office",
             area: zone?.area || 0,
             height: zone?.height || 3.0,
             heatingTemp: zone?.temperatureSetpoints.heating ?? 20,
@@ -107,10 +106,13 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
             ventilationMode: zone?.ventilationMode || "natural",
             lightingPowerDensity: zone?.lighting?.powerDensity,
             lightingEfficacy: zone?.lighting?.efficacy ?? 60,
+            linkedLightingSystemId: zone?.linkedLightingSystemId || "none",
             heatingReducedMode: zone?.heatingReducedMode || "setback",
             isMechanical: (zone?.linkedVentilationUnitIds || []).length > 0,
         },
     });
+
+    const lightingSystems = (systems || []).filter(s => s.type === "LIGHTING") as LightingSystem[];
 
     // const isMech = form.watch("isMechanical");
     // isMechanical 필드는 UI 로직에서 제거되었습니다. (자동 판단)
@@ -119,7 +121,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
         if (zone) {
             form.reset({
                 name: zone.name,
-                usageType: zone.usageType || "1_single_office",
+                usageType: zone.usageType || "1_office",
                 area: zone.area,
                 height: zone.height,
                 heatingTemp: zone.temperatureSetpoints?.heating || 20,
@@ -127,6 +129,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 thermalBridgeMode: zone.thermalBridgeMode || 0.10,
                 lightingEfficacy: zone.lighting?.efficacy || 60,
                 lightingPowerDensity: zone.lighting?.powerDensity || undefined,
+                linkedLightingSystemId: zone.linkedLightingSystemId || "none",
                 linkedVentilationUnitIds: zone.linkedVentilationUnitIds || [],
                 ventilationMode: zone.ventilationMode || "natural",
                 heatingReducedMode: zone.heatingReducedMode || "setback",
@@ -135,7 +138,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
         } else {
             form.reset({
                 name: "",
-                usageType: "1_single_office",
+                usageType: "1_office",
                 area: 0,
                 height: 3.0,
                 heatingTemp: 20,
@@ -143,6 +146,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 thermalBridgeMode: 0.10,
                 lightingEfficacy: 60,
                 lightingPowerDensity: undefined,
+                linkedLightingSystemId: "none",
                 linkedVentilationUnitIds: [],
                 ventilationMode: "natural",
                 heatingReducedMode: "setback",
@@ -176,15 +180,21 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 },
                 linkedVentilationUnitIds: values.linkedVentilationUnitIds || [],
                 ventilationMode: ((values.linkedVentilationUnitIds && values.linkedVentilationUnitIds.length > 0) ? "mechanical" : "natural") as "natural" | "mechanical" | "balanced_mech",
+                linkedLightingSystemId: values.linkedLightingSystemId === "none" ? undefined : values.linkedLightingSystemId,
                 heatingReducedMode: values.heatingReducedMode,
             };
 
+            // Remove null/undefined keys to satisfy Firestore addDoc
+            const cleanZoneData = Object.fromEntries(
+                Object.entries(zoneData).filter(([_, v]) => v !== undefined && v !== null)
+            );
+
             if (zone && zone.id) {
-                await updateZone(projectId, zone.id, zoneData);
-                if (onSuccess) onSuccess({ ...zone, ...zoneData });
+                await updateZone(projectId, zone.id, cleanZoneData);
+                if (onSuccess) onSuccess({ ...zone, ...cleanZoneData } as Zone);
             } else {
-                const newId = await createZone(projectId, zoneData);
-                if (onSuccess) onSuccess({ id: newId, projectId, ...zoneData });
+                const newId = await createZone(projectId, cleanZoneData as any);
+                if (onSuccess) onSuccess({ id: newId, projectId, ...cleanZoneData } as Zone);
             }
         } catch (e: any) {
             console.error("Zone save error:", e);
@@ -424,6 +434,15 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                     </div>
                 </div>
 
+
+
+                {/* 2. Envelope Configuration (Rendered externally if provided and zone exists) */}
+                {renderEnvelope && zone && (
+                    <div className="space-y-4 mb-4">
+                        {renderEnvelope()}
+                    </div>
+                )}
+
                 {/* 1.1 Temperature & Operation Mode Section */}
                 <div className="space-y-4 border p-4 rounded-lg bg-card text-card-foreground shadow-sm">
                     <h2 className="text-lg font-semibold">난방/냉방 설정</h2>
@@ -501,13 +520,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                     </div>
                 </div>
 
-                {/* 2. Envelope Configuration (Rendered externally if provided and zone exists) */}
-                {renderEnvelope && zone && (
-                    <div className="space-y-4">
-                        {renderEnvelope()}
-                    </div>
-                )}
-
                 {/* 3. Ventilation Settings */}
                 <CollapsibleSection
                     title="환기 설정 (Ventilation)"
@@ -569,51 +581,89 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                     icon={<Lightbulb className="h-5 w-5" />}
                     defaultOpen={false}
                 >
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                         <FormField
                             control={form.control}
-                            name="lightingEfficacy"
+                            name="linkedLightingSystemId"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="flex justify-between">
-                                        광효율 (lm/W)
-                                        <span className="text-xs text-muted-foreground font-normal">기본: 60 (형광등/LED)</span>
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input type="number" placeholder="60" {...field} />
-                                    </FormControl>
+                                    <FormLabel>연결된 조명 시스템</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="조명 시스템 선택 (선택사항)" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="none">개별 설정 사용 (Linked System 없음)</SelectItem>
+                                            {lightingSystems.map((sys) => (
+                                                <SelectItem key={sys.id} value={sys.id}>
+                                                    {sys.name} (효율: {sys.lightingEfficacy} lm/W, {sys.controlType})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <FormDescription>
-                                        LED 등 고효율 조명 적용 시 100~130 입력
+                                        설비 탭에서 등록한 공용 조명 시스템을 선택할 수 있습니다.
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="lightingPowerDensity"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="flex justify-between">
-                                        설치 전력 밀도 (W/m²)
-                                        <span className="text-xs text-muted-foreground font-normal">
-                                            자동 계산: {(selectedProfile && form.getValues("lightingEfficacy") && Number(form.getValues("lightingEfficacy")) > 0)
-                                                ? (selectedProfile.illuminance / Number(form.getValues("lightingEfficacy"))).toFixed(1)
-                                                : "-"}
-                                        </span>
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.1" placeholder="직접 입력 시 자동 계산 무시" {...field} />
-                                    </FormControl>
-                                    <FormDescription>
-                                        직접 입력하지 않으면 조도/광효율로 계산됨
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+
+                        <div className="pt-2 border-t mt-4 mb-2">
+                            <h4 className="text-sm font-medium mb-1">상세 설정 오버라이드</h4>
+                            <p className="text-xs text-muted-foreground mb-4">연결된 시스템이 있더라도 아래 값을 입력하면 해당 값이 우선 적용됩니다.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="lightingEfficacy"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex justify-between">
+                                            광효율 (lm/W)
+                                            <span className="text-xs text-muted-foreground font-normal">기본: 60 (형광등/LED)</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder="60" {...field} />
+                                        </FormControl>
+                                        <FormDescription>
+                                            LED 등 고효율 조명 적용 시 100~130 입력
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="lightingPowerDensity"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex justify-between">
+                                            설치 전력 밀도 (W/m²)
+                                            <span className="text-xs text-muted-foreground font-normal">
+                                                자동 계산: {(selectedProfile && form.getValues("lightingEfficacy") && Number(form.getValues("lightingEfficacy")) > 0)
+                                                    ? (selectedProfile.illuminance / Number(form.getValues("lightingEfficacy"))).toFixed(1)
+                                                    : "-"}
+                                            </span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input type="number" step="0.1" placeholder="직접 입력 시 자동 계산 무시" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormDescription>
+                                            직접 입력하지 않으면 조도/광효율로 계산됨
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
                     </div>
                 </CollapsibleSection>
+
+
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
 

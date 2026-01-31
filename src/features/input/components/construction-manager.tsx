@@ -37,6 +37,14 @@ import {
     rectSortingStrategy
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ConstructionManagerProps {
     constructions: Construction[];
@@ -160,6 +168,8 @@ export function ConstructionManager({ constructions, projectId, onUpdate }: Cons
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [items, setItems] = useState<Construction[]>(constructions);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
 
     // Sync items when props change (e.g. initial load or refetch)
     useEffect(() => {
@@ -219,15 +229,24 @@ export function ConstructionManager({ constructions, projectId, onUpdate }: Cons
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm("이 외피 유형을 삭제하시겠습니까? (Are you sure you want to delete this assembly?)")) {
-            try {
-                await deleteConstruction(projectId, id);
-                onUpdate(); // Trigger refresh in parent
-            } catch (error) {
-                console.error("Failed to delete construction:", error);
-                alert("삭제 중 오류가 발생했습니다.");
-            }
+    const handleDeleteClick = (id: string) => {
+        const item = items.find(c => c.id === id);
+        if (item) {
+            setItemToDelete({ id, name: item.name });
+            setDeleteConfirmOpen(true);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!itemToDelete) return;
+        try {
+            await deleteConstruction(projectId, itemToDelete.id);
+            setDeleteConfirmOpen(false);
+            setItemToDelete(null);
+            onUpdate(); // Trigger refresh in parent
+        } catch (error) {
+            console.error("Failed to delete construction:", error);
+            alert("삭제 중 오류가 발생했습니다.");
         }
     };
 
@@ -271,7 +290,7 @@ export function ConstructionManager({ constructions, projectId, onUpdate }: Cons
                                 key={c.id}
                                 c={c}
                                 onEdit={(id) => { setEditingId(id); setIsEditing(true); }}
-                                onDelete={handleDelete}
+                                onDelete={handleDeleteClick}
                             />
                         ))}
                         {items.length === 0 && (
@@ -282,6 +301,26 @@ export function ConstructionManager({ constructions, projectId, onUpdate }: Cons
                     </div>
                 </SortableContext>
             </DndContext>
+
+            <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>외피 유형 삭제 확인</DialogTitle>
+                        <DialogDescription>
+                            정말로 &apos;{itemToDelete?.name}&apos; 외피 유형을 삭제하시겠습니까?
+                            현재 이 유형을 사용 중인 모든 표면에서의 연결 정보가 손실될 수 있습니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                            취소
+                        </Button>
+                        <Button variant="destructive" onClick={confirmDelete}>
+                            삭제
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

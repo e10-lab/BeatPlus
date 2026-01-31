@@ -13,6 +13,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Building2, MapPin, CalendarDays, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ProjectSettingsForm } from "@/features/input/components/project-settings-form";
+import { ClimateView } from "@/features/results/components/climate-view";
+
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CLIMATE_ZONE_LABELS } from "@/lib/constants";
 
 export default function ProjectDetailsPage() {
@@ -23,6 +27,7 @@ export default function ProjectDetailsPage() {
     const [loading, setLoading] = useState(true);
 
     const [activeTab, setActiveTab] = useState("overview");
+
 
     const projectId = params.id as string;
 
@@ -96,26 +101,33 @@ export default function ProjectDetailsPage() {
                 </div>
             </div>
 
+
+
             {/* Main Content Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+                <TabsList className="grid w-full grid-cols-4 lg:w-[540px]">
                     <TabsTrigger value="overview">개요 (Overview)</TabsTrigger>
                     <TabsTrigger value="geometry">형상 (Geometry)</TabsTrigger>
                     <TabsTrigger value="results">결과 (Results)</TabsTrigger>
+                    <TabsTrigger value="climate">기후 (Climate)</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-6 space-y-4">
                     <ProjectSettingsForm project={project} onUpdate={setProject} />
                 </TabsContent>
 
-                <TabsContent value="geometry" className="mt-6">
+                <TabsContent value="geometry" className="mt-6 space-y-4">
                     <ProjectGeometryView projectId={params.id as string} />
                 </TabsContent>
 
                 <TabsContent value="results" className="mt-6">
                     <ResultsView projectId={params.id as string} isActive={activeTab === "results"} />
                 </TabsContent>
+
+                <TabsContent value="climate" className="mt-6">
+                    <ClimateView projectId={params.id as string} />
+                </TabsContent>
             </Tabs>
-        </div>
+        </div >
     );
 }

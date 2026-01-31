@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, Timestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 // TODO: Add SDKs for Firebase products that you want to use
@@ -33,5 +33,25 @@ console.log("Firebase App Initialized:", {
 export const analytics = typeof window !== "undefined" ? getAnalytics(app) : null;
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+/**
+ * Recursively removes 'undefined' values from an object, which Firestore doesn't support.
+ * Also preserves common Firestore types like Date and Timestamp.
+ */
+export const sanitizeData = (data: any): any => {
+    if (data === null || data === undefined) return null;
+    if (Array.isArray(data)) return data.map(sanitizeData);
+    if (data instanceof Date || data instanceof Timestamp) return data;
+    if (typeof data === 'object') {
+        const result: any = {};
+        for (const [key, value] of Object.entries(data)) {
+            if (value !== undefined) {
+                result[key] = sanitizeData(value);
+            }
+        }
+        return result;
+    }
+    return data;
+};
 
 export default app;

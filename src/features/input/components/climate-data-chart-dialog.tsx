@@ -45,8 +45,8 @@ export function ClimateDataChartDialog({ station, trigger }: ClimateDataChartDia
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="h-[400px] w-full mt-4">
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[400px] min-h-[400px] w-full mt-4">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <ComposedChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                             <CartesianGrid stroke="#f5f5f5" />
                             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
