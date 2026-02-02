@@ -1,16 +1,24 @@
 
 import { Orientation } from "./project";
 
-export type EnergySource =
+export type EnergyCarrier =
     | "electricity"
     | "natural_gas"
     | "oil"
     | "lpg"
     | "district_heating"
     | "wood_pellet"
-    | "solar_thermal"
-    | "heat_pump_air"
-    | "heat_pump_geo";
+    | "biomass"
+    | "solar_thermal"; // Keeps as carrier for consistency with previous use, though debatably a source
+
+export type HeatSource =
+    | "outdoor_air"
+    | "exhaust_air"
+    | "ground_brine"
+    | "ground_water"
+    | "surface_water"
+    | "waste_heat"
+    | "solar";
 
 export interface SystemBase {
     id: string;
@@ -25,7 +33,8 @@ export interface DHWSystem extends SystemBase {
     type: "DHW";
     generator: {
         type: "boiler" | "heat_pump" | "electric_heater" | "district" | "solar";
-        fuel: EnergySource;
+        energyCarrier: EnergyCarrier;
+        heatSource?: HeatSource;
         efficiency: number; // 0-1 (e.g. 0.9 for boiler, 3.0 for HP COP)
         capacity?: number; // kW
     };
@@ -47,7 +56,8 @@ export interface HeatingSystem extends SystemBase {
     type: "HEATING";
     generator: {
         type: "condensing_boiler" | "std_boiler" | "heat_pump" | "ehp" | "split" | "electric" | "district";
-        fuel: EnergySource;
+        energyCarrier: EnergyCarrier;
+        heatSource?: HeatSource;
         efficiency: number; // Nominal Efficiency (0-1+)or COP
         partLoadValue?: number; // Efficiency at 30% load (for curve)
     };
@@ -66,7 +76,8 @@ export interface CoolingSystem extends SystemBase {
     type: "COOLING";
     generator: {
         type: "compression_chiller" | "absorption_chiller" | "heat_pump" | "ehp" | "split";
-        fuel: EnergySource;
+        energyCarrier: EnergyCarrier;
+        heatSource?: HeatSource;
         efficiency: number; // EER or SEER
         condenserType?: "air_cooled" | "water_cooled"; // Default air_cooled
     };
@@ -107,14 +118,16 @@ export interface AHUSystem extends SystemBase {
     // Heating Part
     heatingCoil?: {
         generatorType: "boiler" | "heat_pump" | "district" | "electric";
-        fuel: EnergySource;
+        energyCarrier: EnergyCarrier;
+        heatSource?: HeatSource;
         efficiency: number;
     };
 
     // Cooling Part
     coolingCoil?: {
         generatorType: "chiller" | "heat_pump" | "district";
-        fuel: EnergySource;
+        energyCarrier: EnergyCarrier;
+        heatSource?: HeatSource;
         efficiency: number;
     };
 }

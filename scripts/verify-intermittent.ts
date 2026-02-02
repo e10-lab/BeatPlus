@@ -8,7 +8,7 @@ const baseZone: ZoneInput = {
     id: 'zone-1',
     projectId: 'proj-1',
     name: 'Office',
-    usageType: '1_single_office', // 250 days/year (Weekend off)
+    usageType: '1_office', // 250 days/year (Weekend off)
     area: 100,
     height: 3,
     volume: 300,
@@ -18,7 +18,8 @@ const baseZone: ZoneInput = {
     surfaces: [
         {
             id: 's1', zoneId: 'zone-1', name: 'Wall', type: 'wall_exterior',
-            area: 50, uValue: 0.5, orientation: 'S', tilt: 90, absorptionCoefficient: 0.5
+            area: 50, uValue: 0.5, orientation: 'S', tilt: 90, absorptionCoefficient: 0.5,
+            shading: { hasDevice: false, fcValue: 1.0, type: 'external' }
         } as Surface
     ],
     // High Mass

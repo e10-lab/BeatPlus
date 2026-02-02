@@ -11,17 +11,18 @@ function createMockZone(id: string, usageType: any, area: number, height: number
         usageType,
         area,
         height,
+        volume: area * height,
         surfaces: [
             // Simple box: 10x10m, 3m height.
             // Wall area = 10*3 * 4 = 120. Net wall = 120 - Window.
             // South Window 10m2
-            { id: 'w1', name: 'N', type: 'wall_exterior', area: 30, uValue: 0.24, orientation: 'N', tilt: 90 },
-            { id: 'w2', name: 'S', type: 'wall_exterior', area: 20, uValue: 0.24, orientation: 'S', tilt: 90 },
-            { id: 'win1', name: 'Win S', type: 'window', area: 10, uValue: 1.3, shgc: 0.6, orientation: 'S', tilt: 90 },
-            { id: 'w3', name: 'E', type: 'wall_exterior', area: 30, uValue: 0.24, orientation: 'E', tilt: 90 },
-            { id: 'w4', name: 'W', type: 'wall_exterior', area: 30, uValue: 0.24, orientation: 'W', tilt: 90 },
-            { id: 'r1', name: 'Roof', type: 'roof_exterior', area: 100, uValue: 0.15, orientation: 'S', tilt: 0 },
-            { id: 'f1', name: 'Floor', type: 'floor_ground', area: 100, uValue: 0.3, orientation: 'NoExposure', tilt: 0 }
+            { id: 'w1', zoneId: 'z1', name: 'N', type: 'wall_exterior', area: 30, uValue: 0.24, orientation: 'N', tilt: 90 },
+            { id: 'w2', zoneId: 'z1', name: 'S', type: 'wall_exterior', area: 20, uValue: 0.24, orientation: 'S', tilt: 90 },
+            { id: 'win1', zoneId: 'z1', name: 'Win S', type: 'window', area: 10, uValue: 1.3, shgc: 0.6, orientation: 'S', tilt: 90 },
+            { id: 'w3', zoneId: 'z1', name: 'E', type: 'wall_exterior', area: 30, uValue: 0.24, orientation: 'E', tilt: 90 },
+            { id: 'w4', zoneId: 'z1', name: 'W', type: 'wall_exterior', area: 30, uValue: 0.24, orientation: 'W', tilt: 90 },
+            { id: 'r1', zoneId: 'z1', name: 'Roof', type: 'roof_exterior', area: 100, uValue: 0.15, orientation: 'S', tilt: 0 },
+            { id: 'f1', zoneId: 'z1', name: 'Floor', type: 'floor_ground', area: 100, uValue: 0.3, orientation: 'NoExposure', tilt: 0 }
         ],
         temperatureSetpoints: {
             heating: 20,

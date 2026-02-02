@@ -37,7 +37,8 @@ const dhwSchema = systemBaseSchema.extend({
     type: z.literal("DHW"),
     generator: z.object({
         type: z.enum(["boiler", "heat_pump", "electric_heater", "district", "solar"]),
-        fuel: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "solar_thermal", "heat_pump_air", "heat_pump_geo"]),
+        energyCarrier: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "biomass", "solar_thermal"]),
+        heatSource: z.enum(["outdoor_air", "exhaust_air", "ground_brine", "ground_water", "surface_water", "waste_heat", "solar"]).optional(),
         efficiency: z.coerce.number().min(0.1).max(10), // COP can be > 1
         capacity: z.coerce.number().optional(),
     }),
@@ -58,7 +59,8 @@ const heatingSchema = systemBaseSchema.extend({
     type: z.literal("HEATING"),
     generator: z.object({
         type: z.enum(["condensing_boiler", "std_boiler", "heat_pump", "ehp", "split", "electric", "district"]),
-        fuel: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "solar_thermal", "heat_pump_air", "heat_pump_geo"]),
+        energyCarrier: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "biomass", "solar_thermal"]),
+        heatSource: z.enum(["outdoor_air", "exhaust_air", "ground_brine", "ground_water", "surface_water", "waste_heat", "solar"]).optional(),
         efficiency: z.coerce.number().min(0.1).max(10),
         partLoadValue: z.coerce.number().optional(),
     }),
@@ -76,7 +78,8 @@ const coolingSchema = systemBaseSchema.extend({
     type: z.literal("COOLING"),
     generator: z.object({
         type: z.enum(["compression_chiller", "absorption_chiller", "heat_pump", "ehp", "split"]),
-        fuel: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "solar_thermal", "heat_pump_air", "heat_pump_geo"]),
+        energyCarrier: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "biomass", "solar_thermal"]),
+        heatSource: z.enum(["outdoor_air", "exhaust_air", "ground_brine", "ground_water", "surface_water", "waste_heat", "solar"]).optional(),
         efficiency: z.coerce.number().min(0.1).max(10),
         condenserType: z.enum(["air_cooled", "water_cooled"]).optional(),
     }),
@@ -113,12 +116,14 @@ const ahuSchema = systemBaseSchema.extend({
     fanPower: z.coerce.number().min(0), // SFP
     heatingCoil: z.object({
         generatorType: z.enum(["boiler", "heat_pump", "district", "electric"]),
-        fuel: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "heat_pump_air", "heat_pump_geo"]),
+        energyCarrier: z.enum(["electricity", "natural_gas", "oil", "lpg", "district_heating", "wood_pellet", "biomass"]),
+        heatSource: z.enum(["outdoor_air", "exhaust_air", "ground_brine", "ground_water", "surface_water", "waste_heat", "solar"]).optional(),
         efficiency: z.coerce.number().min(0.1),
     }).optional(),
     coolingCoil: z.object({
         generatorType: z.enum(["chiller", "heat_pump", "district"]),
-        fuel: z.enum(["electricity", "natural_gas", "district_heating", "heat_pump_air", "heat_pump_geo"]),
+        energyCarrier: z.enum(["electricity", "natural_gas", "district_heating"]),
+        heatSource: z.enum(["outdoor_air", "exhaust_air", "ground_brine", "ground_water", "surface_water", "waste_heat", "solar"]).optional(),
         efficiency: z.coerce.number().min(0.1),
     }).optional(),
 });
@@ -169,7 +174,7 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                 type: "DHW",
                 generator: {
                     type: "boiler",
-                    fuel: "natural_gas",
+                    energyCarrier: "natural_gas",
                     efficiency: 0.9,
                 },
                 storage: {
@@ -188,7 +193,7 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                 type: "HEATING",
                 generator: {
                     type: "condensing_boiler",
-                    fuel: "natural_gas",
+                    energyCarrier: "natural_gas",
                     efficiency: 0.9,
                 },
                 distribution: {
@@ -205,7 +210,7 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                 type: "COOLING",
                 generator: {
                     type: "compression_chiller",
-                    fuel: "electricity",
+                    energyCarrier: "electricity",
                     efficiency: 3.5,
                 },
                 distribution: {
@@ -246,12 +251,12 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                 },
                 heatingCoil: {
                     generatorType: "boiler",
-                    fuel: "natural_gas",
+                    energyCarrier: "natural_gas",
                     efficiency: 0.9
                 },
                 coolingCoil: {
                     generatorType: "chiller",
-                    fuel: "electricity",
+                    energyCarrier: "electricity",
                     efficiency: 3.5
                 }
             };
@@ -452,10 +457,10 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                             />
                                             <FormField
                                                 control={form.control as any}
-                                                name="generator.fuel"
+                                                name="generator.energyCarrier"
                                                 render={({ field }) => (
                                                     <FormItem>
-                                                        <FormLabel>연료/에너지원</FormLabel>
+                                                        <FormLabel>연료 (Energy Carrier)</FormLabel>
                                                         <Select onValueChange={field.onChange} defaultValue={field.value as string}>
                                                             <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                             <SelectContent>
@@ -464,14 +469,35 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                                                 <SelectItem value="oil">등유/경유</SelectItem>
                                                                 <SelectItem value="lpg">LPG</SelectItem>
                                                                 <SelectItem value="district_heating">지역난방열</SelectItem>
-                                                                <SelectItem value="heat_pump_air">공기열 (HP)</SelectItem>
-                                                                <SelectItem value="heat_pump_geo">지열 (HP)</SelectItem>
+                                                                <SelectItem value="wood_pellet">목재 펠릿</SelectItem>
                                                             </SelectContent>
                                                         </Select>
                                                         <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
+                                            {form.watch("generator.type") === "heat_pump" && (
+                                                <FormField
+                                                    control={form.control as any}
+                                                    name="generator.heatSource"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>열원 (Heat Source)</FormLabel>
+                                                            <Select onValueChange={field.onChange} defaultValue={field.value as string}>
+                                                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                                                <SelectContent>
+                                                                    <SelectItem value="outdoor_air">공기열 (Outdoor Air)</SelectItem>
+                                                                    <SelectItem value="exhaust_air">배기열 (Exhaust Air)</SelectItem>
+                                                                    <SelectItem value="ground_brine">지표면/지중 (Brine)</SelectItem>
+                                                                    <SelectItem value="ground_water">지하수 (Ground Water)</SelectItem>
+                                                                    <SelectItem value="surface_water">하천수/수열 (Surface Water)</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            )}
                                             <FormField
                                                 control={form.control as any}
                                                 name="generator.efficiency"
@@ -925,7 +951,7 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                                 checked={!!form.watch("heatingCoil")}
                                                 onCheckedChange={(checked) => {
                                                     if (checked) {
-                                                        form.setValue("heatingCoil", { generatorType: "boiler", fuel: "natural_gas", efficiency: 0.9 });
+                                                        form.setValue("heatingCoil", { generatorType: "boiler", energyCarrier: "natural_gas", efficiency: 0.9 });
                                                     } else {
                                                         form.setValue("heatingCoil", undefined);
                                                     }
@@ -954,10 +980,10 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                                 />
                                                 <FormField
                                                     control={form.control as any}
-                                                    name="heatingCoil.fuel"
+                                                    name="heatingCoil.energyCarrier"
                                                     render={({ field }) => (
                                                         <FormItem>
-                                                            <FormLabel>연료 Source</FormLabel>
+                                                            <FormLabel>연료 (Energy Carrier)</FormLabel>
                                                             <Select onValueChange={field.onChange} defaultValue={field.value as string}>
                                                                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                                 <SelectContent>
@@ -966,13 +992,34 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                                                     <SelectItem value="district_heating">지역난방</SelectItem>
                                                                     <SelectItem value="oil">등유</SelectItem>
                                                                     <SelectItem value="lpg">LPG</SelectItem>
-                                                                    <SelectItem value="heat_pump_air">공기열 HP</SelectItem>
-                                                                    <SelectItem value="heat_pump_geo">지열 HP</SelectItem>
+                                                                    <SelectItem value="wood_pellet">목재 펠릿</SelectItem>
+                                                                    <SelectItem value="biomass">바이오매스</SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                         </FormItem>
                                                     )}
                                                 />
+                                                {form.watch("heatingCoil.generatorType") === "heat_pump" && (
+                                                    <FormField
+                                                        control={form.control as any}
+                                                        name="heatingCoil.heatSource"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel>열원 (Heat Source)</FormLabel>
+                                                                <Select onValueChange={field.onChange} defaultValue={field.value as string}>
+                                                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="outdoor_air">공기열 (Air)</SelectItem>
+                                                                        <SelectItem value="exhaust_air">배기열 (Exhaust)</SelectItem>
+                                                                        <SelectItem value="ground_brine">지표면/지중 (Brine)</SelectItem>
+                                                                        <SelectItem value="ground_water">지하수 (Ground Water)</SelectItem>
+                                                                        <SelectItem value="surface_water">하천수/수열 (Surface Water)</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                )}
                                                 <FormField
                                                     control={form.control as any}
                                                     name="heatingCoil.efficiency"
@@ -997,7 +1044,7 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                                 checked={!!form.watch("coolingCoil")}
                                                 onCheckedChange={(checked) => {
                                                     if (checked) {
-                                                        form.setValue("coolingCoil", { generatorType: "chiller", fuel: "electricity", efficiency: 3.5 });
+                                                        form.setValue("coolingCoil", { generatorType: "chiller", energyCarrier: "electricity", efficiency: 3.5 });
                                                     } else {
                                                         form.setValue("coolingCoil", undefined);
                                                     }
@@ -1025,21 +1072,41 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                                 />
                                                 <FormField
                                                     control={form.control as any}
-                                                    name="coolingCoil.fuel"
+                                                    name="coolingCoil.energyCarrier"
                                                     render={({ field }) => (
                                                         <FormItem>
-                                                            <FormLabel>에너지원</FormLabel>
+                                                            <FormLabel>연료 (Energy Carrier)</FormLabel>
                                                             <Select onValueChange={field.onChange} defaultValue={field.value as string}>
                                                                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                                 <SelectContent>
                                                                     <SelectItem value="electricity">전기</SelectItem>
-                                                                    <SelectItem value="natural_gas">가스(GHP)</SelectItem>
+                                                                    <SelectItem value="natural_gas">가스 (냉동기 엔진용)</SelectItem>
                                                                     <SelectItem value="district_heating">지역냉방</SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                         </FormItem>
                                                     )}
                                                 />
+                                                {form.watch("coolingCoil.generatorType") === "heat_pump" && (
+                                                    <FormField
+                                                        control={form.control as any}
+                                                        name="coolingCoil.heatSource"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel>열원 (Heat Source)</FormLabel>
+                                                                <Select onValueChange={field.onChange} defaultValue={field.value as string}>
+                                                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="outdoor_air">공기열 (Air)</SelectItem>
+                                                                        <SelectItem value="ground_brine">지표면/지중 (Brine)</SelectItem>
+                                                                        <SelectItem value="ground_water">지하수 (Ground Water)</SelectItem>
+                                                                        <SelectItem value="surface_water">하천수/수열 (Surface Water)</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                )}
                                                 <FormField
                                                     control={form.control as any}
                                                     name="coolingCoil.efficiency"

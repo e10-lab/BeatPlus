@@ -5,7 +5,7 @@ import { DIN_18599_PROFILES } from "../src/lib/din-18599-profiles";
 import { KOREA_WEATHER_STATIONS } from "../src/lib/climate-data";
 import { DEFAULT_MATERIALS } from "../src/lib/materials";
 
-// Load environment variables from .env.local
+// .env.local 파일에서 환경 변수 로드
 dotenv.config({ path: '.env.local' });
 
 const firebaseConfig = {
@@ -18,45 +18,45 @@ const firebaseConfig = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
+// Firebase 초기화
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 async function seedData() {
-    console.log("Starting data seeding...");
-    console.log(`Writing to project: ${firebaseConfig.projectId}`);
+    console.log("데이터 시딩(Seeding) 시작...");
+    console.log(`대상 프로젝트: ${firebaseConfig.projectId}`);
 
     try {
-        // 1. Seed Usage Profiles
-        console.log("Seeding Usage Profiles...");
+        // 1. 용도 프로필(Usage Profiles) 데이터 업로드
+        console.log("용도 프로필 데이터를 업로드 중...");
         const profilesBatch = writeBatch(db);
         let profileCount = 0;
-        
+
         for (const [key, profile] of Object.entries(DIN_18599_PROFILES)) {
             const ref = doc(db, "usage_profiles", profile.id);
             profilesBatch.set(ref, profile);
             profileCount++;
         }
         await profilesBatch.commit();
-        console.log(`✅ Seeded ${profileCount} usage profiles.`);
+        console.log(`✅ ${profileCount}개의 용도 프로필 업로드 완료.`);
 
-        // 2. Seed Weather Stations
-        console.log("Seeding Weather Stations...");
+        // 2. 기상 관측소(Weather Stations) 데이터 업로드
+        console.log("기상 관측소 데이터를 업로드 중...");
         const weatherBatch = writeBatch(db);
         let weatherCount = 0;
-        
+
         for (const station of KOREA_WEATHER_STATIONS) {
             const ref = doc(db, "climate_stations", station.id.toString());
             weatherBatch.set(ref, station);
             weatherCount++;
         }
         await weatherBatch.commit();
-        console.log(`✅ Seeded ${weatherCount} weather stations.`);
+        console.log(`✅ ${weatherCount}개의 기상 관측소 정보 업로드 완료.`);
 
-        // 3. Seed Materials
-        console.log("Seeding Materials...");
-        // Batches have a limit of 500 operations. Materials might exceed this if we add more.
-        // For now DEFAULT_MATERIALS is < 200 items.
+        // 3. 자재(Materials) 데이터 업로드
+        console.log("자재 라이브러리 데이터를 업로드 중...");
+        // Firestore 일괄 처리(Batch)는 한 번에 500개 작업으로 제한됨
+        // 현재 DEFAULT_MATERIALS는 약 200개 미만임
         const materialsBatch = writeBatch(db);
         let materialCount = 0;
 
@@ -66,11 +66,11 @@ async function seedData() {
             materialCount++;
         }
         await materialsBatch.commit();
-        console.log(`✅ Seeded ${materialCount} materials.`);
+        console.log(`✅ ${materialCount}개의 자재 정보 업로드 완료.`);
 
-        console.log("🎉 Data seeding completed successfully!");
+        console.log("🎉 모든 데이터 시딩 작업이 성공적으로 완료되었습니다!");
     } catch (error) {
-        console.error("❌ Error seeding data:", error);
+        console.error("❌ 데이터 업로드 중 오류 발생:", error);
         process.exit(1);
     }
 }

@@ -1,17 +1,16 @@
-
 import { UsageProfile } from "@/lib/din-18599-profiles";
 import { ZoneInput } from "./types";
 import { DHWSystem } from "@/types/system";
 
 /**
- * Domestic Hot Water Calculation (DIN V 18599-8)
- * Includes Storage Losses (Q_W,s) and Distribution Losses (Q_W,d)
+ * 급탕 에너지 부하 계산 (DIN V 18599-8)
+ * 저장 손실(Q_W,s) 및 배관 손실(Q_W,d)을 포함합니다.
  */
 
 interface DHWResult {
-    energyDHW: number; // [Wh] Total Energy Demand (Useful + Losses) -> Q_W,gen,out
-    heatGainDHW: number; // [Wh] Internal heat gain from losses -> Q_W,int
-    usefulEnergy: number; // [Wh] Pure demand at tap -> Q_W,b
+    energyDHW: number; // [Wh] 총 에너지 요구량 (유효 수요 + 손실) -> Q_W,gen,out
+    heatGainDHW: number; // [Wh] 손실에 의한 내부 발열량 -> Q_W,int
+    usefulEnergy: number; // [Wh] 수도꼭지에서의 유효 수요량 -> Q_W,b
 }
 
 export function calculateHourlyDHW(
@@ -20,20 +19,19 @@ export function calculateHourlyDHW(
     hourOfDay: number, // 0-23
     isOccupied: boolean,
     dhwSystem?: DHWSystem,
-    ambientTemp: number = 20, // Surrounding temp for storage/pipes (default 20C)
-    // In a full implementation, ambientTemp would come from the zone's calculated air temp of the previous step
+    ambientTemp: number = 20, // 저장탱크/배관 주변 온도 (기본값 20C)
 ): DHWResult {
 
-    // --- 1. Useful Energy Demand (Q_W,b) ---
+    // --- 1. 유효 에너지 수요 (Useful Energy Demand, Q_W,b) ---
     // Q_W,b,d = q_w,b,spec * A_NGF
-    const dhwDemandSpecific = profile.dhwDemand || 0; // Wh/(m²·d)
-    const dailyDemand = dhwDemandSpecific * zone.area; // [Wh/d]
+    const dhwDemandSpecific = profile.dhwDemand || 0; // 단위 면적당 일일 수요량 Wh/(m²·d)
+    const dailyDemand = dhwDemandSpecific * zone.area; // [Wh/d] 총 일일 수요량
 
     if (dailyDemand <= 0) {
         return { energyDHW: 0, heatGainDHW: 0, usefulEnergy: 0 };
     }
 
-    // Hourly Distribution
+    // 시간별 배분 로직
     let hourlyFraction = 0;
     if (isOccupied) {
         let usageDuration = 0;
@@ -46,29 +44,22 @@ export function calculateHourlyDHW(
         if (usageDuration > 0) {
             hourlyFraction = 1 / usageDuration;
         } else {
-            // Fallback: Uniform distribution over 24h if occupied but no specific hours?
-            // Or usually profile implies demand only during usage hours.
+            // 재실 중이지만 사용 시간이 정의되지 않은 경우 24시간 균등 배분
             hourlyFraction = 1 / 24;
         }
     } else {
         hourlyFraction = 0;
-        // Note: Some profiles might have small demand during non-occupied (e.g. cleaning),
-        // but simplified profiles assume demand ~ occupancy.
+        // 비재실 시 요구량은 0으로 가정 (청소 등 미미한 부하 제외)
     }
 
-    // Check if current hour is within usage window
-    // (This acts as a filter on top of isOccupied, strictly following profile times)
-    // Simply using isOccupied from the scheduler is safer as it handles day/night logic.
-    // So we use the fraction computed above.
+    const usefulEnergy = dailyDemand * hourlyFraction; // [Wh] 현재 시간의 유효 에너지
 
-    const usefulEnergy = dailyDemand * hourlyFraction; // [Wh]
+    // --- 2. 시스템 손실 (System Losses) ---
 
-    // --- 2. System Losses ---
-
-    // If no system defined, assume ideal system (Efficiency=1.0) but apply a generic distribution loss factor
-    // to represent heat given off to the room (part of standard calculation).
+    // 급탕 시스템이 정의되지 않은 경우 이상적인 시스템으로 가정하되,
+    // 실내로 방출되는 일반적인 배관 손실 열량(20%)만 반영
     if (!dhwSystem) {
-        const heatGainDHW = usefulEnergy * 0.2; // Default 20% loss gain
+        const heatGainDHW = usefulEnergy * 0.2;
         return {
             energyDHW: usefulEnergy,
             heatGainDHW,
@@ -76,103 +67,74 @@ export function calculateHourlyDHW(
         };
     }
 
-    // A. Storage Losses (Q_W,s)
+    // A. 저장 손실 (Storage Losses, Q_W,s)
     let storageLoss = 0;
     let gainsFromStorage = 0;
 
     if (dhwSystem.storage) {
         const { volume, temperature = 60, location = "conditioned" } = dhwSystem.storage;
 
-        // Standby Heat Loss (Q_B,s in kWh/24h)
-        // If lossFactor is provided (e.g. from ErP label), use it. 
-        // Note: Our type definition has lossFactor as Wh/(L.d.k) or Watts? 
-        // Let's assume the user input or type needs to clearly map. 
-        // For now, let's implement the standard approximation formula (DIN 18599-8 Eq 30 roughly)
-        // Q_B,s = 0.4 + 0.2 * V^0.4 (Example curve) or modern: 0.3 + 0.045 * V^0.6
-        // Let's use a safe approximation for modern tanks:
-        // P_standby_watts ~= 2.5 * V^0.45 
-
-        // Let's use standard Standing Loss Power in Watts:
-        // q_B,s [W] approx 
-        // 200L -> ~50W - 60W
-        // 500L -> ~90W
-        // Formula: P_loss [W] = 0.6 * volume^0.6 (Rough fit)
-
+        // 대기 열손실 (P_loss_avg_W) 계산
+        // DIN 18599-8 기준 현대식 탱크의 표준 대기 손실 공식 사용
         const Q_standby_24h_kWh = 0.3 + 0.045 * Math.pow(volume, 0.6); // kWh/24h
-        const P_loss_avg_W = (Q_standby_24h_kWh * 1000) / 24; // Average Watts at test conditions (dT=45K)
+        const P_loss_avg_W = (Q_standby_24h_kWh * 1000) / 24;
 
-        // Adjust for actual delta T
-        // Test conditions: T_store=65, T_amb=20 -> dT=45
-        // Actual conditions: T_store=temperature, T_amb=ambientTemp
+        // 실제 온도 차이에 따른 보정
+        // 테스트 조건: T_store=65, T_amb=20 -> dT=45
         const dT_actual = temperature - ambientTemp;
         const dT_test = 45;
 
         const correctionFactor = Math.max(0, dT_actual / dT_test);
 
-        storageLoss = P_loss_avg_W * correctionFactor; // [Wh] for 1 hour
+        storageLoss = P_loss_avg_W * correctionFactor; // 시간당 손실 [Wh]
 
-        // Internal Gains from Storage
+        // 실내 설치 시 내부 발열로 산입
         if (location === "conditioned") {
             gainsFromStorage = storageLoss;
-        } else {
-            gainsFromStorage = 0;
         }
     }
 
-    // B. Distribution Losses (Q_W,d)
+    // B. 배관 손실 (Distribution Losses, Q_W,d)
 
-    // 1. Circulation Loop (Q_W,d,c)
+    // 1. 순환 루프 손실 (Circulation Loop, Q_W,d,c)
     let circulationLoss = 0;
     const { hasCirculation, pipeInsulation, pipeLength } = dhwSystem.distribution;
 
     if (hasCirculation) {
-        // Linear heat loss coefficient [W/mK] based on insulation class
-        let psi_circ = 0.20; // none
+        // 단열 등급에 따른 선열손실계수 [W/mK]
+        let psi_circ = 0.20;
         switch (pipeInsulation) {
             case "basic": psi_circ = 0.15; break;
             case "good": psi_circ = 0.10; break;
             case "reinforced": psi_circ = 0.05; break;
         }
 
-        // Pipe Length Estimation (DIN 18599-8 Table 8 or simplified geometry)
-        // L_circ = 2 * (L + W + H) * No_of_risers ...
-        // Simplified: L_circ approx 0.8 * A_NGF^0.5 * NumberOfStories?
-        // Let's use the provided pipeLength or a rough fallback based on zone area.
+        // 루프 배관 길이 추정 (제공된 값이 없으면 존 면적으로부터 근사)
         const L_circ = pipeLength || (10 + 2 * Math.sqrt(zone.area));
 
-        const T_mean = (dhwSystem.storage?.temperature || 60) - 5; // Flow 60, Return 55 -> Mean 57.5?
+        const T_mean = (dhwSystem.storage?.temperature || 60) - 5; // 평균 배관 온도
         const deltaT_circ = T_mean - ambientTemp;
 
-        // Operation hours: Assume 24h for now unless profile implies otherwise.
-        // Or if occupied?
-        const hrs = 1;
-
-        circulationLoss = L_circ * psi_circ * Math.max(0, deltaT_circ) * hrs;
+        circulationLoss = L_circ * psi_circ * Math.max(0, deltaT_circ); // 1시간 손실량
     }
 
-    // 2. Individual Lines (Q_W,d,i)
-    // Heat lost in the "spur" pipes that cool down between uses.
-    // DIN 18599-8 method uses factors or specific pipe geometry.
-    // Simplified: Percentage of useful energy.
-    // Range 10-30%.
-    // Factor depends on pipe length and demand pattern.
-    // Let's use a base factor approach.
-    const k_ind = 0.15; // 15% loss
+    // 2. 개별 지관 손실 (Individual Lines, Q_W,d,i)
+    // 인출 시 배관 내 정체수의 냉각으로 인한 손실 (유효 에너지의 %로 산출)
+    const k_ind = 0.15; // 15% 손실 가정
     const individualLoss = usefulEnergy * k_ind;
 
 
     const distributionLossTotal = circulationLoss + individualLoss;
 
-    // Internal Gains from Distribution
-    // Assume 80% of distribution pipes are within conditioned space
+    // 배관 발열의 80%가 실내(냉난방 구역)로 전달된다고 가정
     const gainsFromDistribution = distributionLossTotal * 0.8;
 
-    // --- 3. Total Results ---
+    // --- 3. 종합 결과 (Total Results) ---
 
-    // Q_W,gen,out = Q_W,b + Q_W,s + Q_W,d
+    // 열원기 출력량 = 유효 수요 + 저장 손손실 + 배관 손손실
     const energyDHW = usefulEnergy + storageLoss + distributionLossTotal;
 
-    // Q_W,int = Gains_storage + Gains_distribution
+    // 내부 발열량 = 저장 탱크 발열 + 배관 발열
     const heatGainDHW = gainsFromStorage + gainsFromDistribution;
 
     return {

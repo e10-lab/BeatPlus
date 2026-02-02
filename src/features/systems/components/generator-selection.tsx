@@ -43,58 +43,59 @@ const SYSTEM_METHOD_DESCRIPTIONS: Record<string, string> = {
 // Mappings & Tooltips
 const HEATING_OPTIONS = {
     hydronic: [
-        { label: "콘덴싱 보일러 (가스)", type: "condensing_boiler", fuel: "natural_gas", desc: "가스를 연소하여 온수를 만듭니다. 효율이 높습니다." },
-        { label: "일반 보일러 (등유/LPG)", type: "std_boiler", fuel: "oil", desc: "기름이나 LPG를 사용하는 일반적인 보일러입니다." },
-        { label: "히트펌프 칠러 (공기열)", type: "heat_pump", fuel: "heat_pump_air", desc: "외부 공기의 열을 흡수하여 온수를 만듭니다. (에어컨의 반대 원리)" },
-        { label: "히트펌프 칠러 (지열)", type: "heat_pump", fuel: "heat_pump_geo", desc: "땅속의 열을 흡수하여 온수를 만듭니다. 효율이 매우 좋습니다." },
-        { label: "전기 보일러", type: "electric", fuel: "electricity", desc: "전기 히터로 물을 데웁니다. 설치는 간편하나 운전 비용이 높을 수 있습니다." },
+        { label: "콘덴싱 보일러 (가스)", type: "condensing_boiler", energyCarrier: "natural_gas", desc: "가스를 연소하여 온수를 만듭니다. 효율이 높습니다." },
+        { label: "일반 보일러 (등유/LPG)", type: "std_boiler", energyCarrier: "oil", desc: "기름이나 LPG를 사용하는 일반적인 보일러입니다." },
+        { label: "히트펌프 칠러 (공기열)", type: "heat_pump", energyCarrier: "electricity", heatSource: "outdoor_air", desc: "외부 공기의 열을 흡수하여 온수를 만듭니다. (에어컨의 반대 원리)" },
+        { label: "히트펌프 칠러 (지열)", type: "heat_pump", energyCarrier: "electricity", heatSource: "ground_brine", desc: "땅속의 열을 흡수하여 온수를 만듭니다. 효율이 매우 좋습니다." },
+        { label: "전기 보일러", type: "electric", energyCarrier: "electricity", desc: "전기 히터로 물을 데웁니다. 설치는 간편하나 운전 비용이 높을 수 있습니다." },
     ],
     refrigerant: [
-        { label: "시스템 에어컨 (EHP - 전기)", type: "ehp", fuel: "electricity", desc: "전기를 사용하여 냉매를 압축하는 히트펌프 시스템입니다." },
-        { label: "시스템 에어컨 (GHP - 가스)", type: "ehp", fuel: "natural_gas", desc: "가스 엔진으로 압축기를 구동합니다. 전력 사용량이 적습니다." },
-        { label: "개별 에어컨 (가정용)", type: "split", fuel: "electricity", desc: "일반적인 가정용 벽걸이/스탠드 에어컨입니다." },
+        { label: "시스템 에어컨 (EHP - 전기)", type: "ehp", energyCarrier: "electricity", heatSource: "outdoor_air", desc: "전기를 사용하여 냉매를 압축하는 히트펌프 시스템입니다." },
+        { label: "시스템 에어컨 (GHP - 가스)", type: "ehp", energyCarrier: "natural_gas", heatSource: "outdoor_air", desc: "가스 엔진으로 압축기를 구동합니다. 전력 사용량이 적습니다." },
+        { label: "개별 에어컨 (가정용)", type: "split", energyCarrier: "electricity", heatSource: "outdoor_air", desc: "일반적인 가정용 벽걸이/스탠드 에어컨입니다." },
     ],
     district: [
-        { label: "지역 난방", type: "district", fuel: "district_heating", desc: "열병합 발전소 등에서 공급되는 온수를 사용합니다." },
+        { label: "지역 난방", type: "district", energyCarrier: "district_heating", desc: "열병합 발전소 등에서 공급되는 온수를 사용합니다." },
     ],
     electric_local: [
-        { label: "전기 난방 (바닥판넬 등)", type: "electric", fuel: "electricity", desc: "전기 필름, 판넬 등 국소적인 난방 장치입니다." },
+        { label: "전기 난방 (바닥판넬 등)", type: "electric", energyCarrier: "electricity", desc: "전기 필름, 판넬 등 국소적인 난방 장치입니다." },
     ]
 };
 
 const COOLING_OPTIONS = {
     hydronic: [
-        { label: "터보/스크류 냉동기 (전기)", type: "compression_chiller", fuel: "electricity", desc: "냉방 전용 장비입니다. 대용량 냉방에 효율적입니다. 난방 불가." },
-        { label: "흡수식 냉동기 (가스/온수)", type: "absorption_chiller", fuel: "natural_gas", desc: "가스나 폐열(온수)을 이용하여 냉수를 만듭니다. 전기를 적게 씁니다." },
-        { label: "히트펌프 칠러 (공기열)", type: "heat_pump", fuel: "heat_pump_air", desc: "냉방과 난방이 모두 가능한 장비입니다. (4-Way 밸브 사용)" },
-        { label: "히트펌프 칠러 (지열)", type: "heat_pump", fuel: "heat_pump_geo", desc: "지열을 이용하여 냉방 효율이 매우 우수합니다." },
+        { label: "터보/스크류 냉동기 (전기)", type: "compression_chiller", energyCarrier: "electricity", desc: "냉방 전용 장비입니다. 대용량 냉방에 효율적입니다. 난방 불가." },
+        { label: "흡수식 냉동기 (가스/온수)", type: "absorption_chiller", energyCarrier: "natural_gas", desc: "가스나 폐열(온수)을 이용하여 냉수를 만듭니다. 전기를 적게 씁니다." },
+        { label: "히트펌프 칠러 (공기열)", type: "heat_pump", energyCarrier: "electricity", heatSource: "outdoor_air", desc: "냉방과 난방이 모두 가능한 장비입니다. (4-Way 밸브 사용)" },
+        { label: "히트펌프 칠러 (지열)", type: "heat_pump", energyCarrier: "electricity", heatSource: "ground_brine", desc: "지열을 이용하여 냉방 효율이 매우 우수합니다." },
     ],
     refrigerant: [
-        { label: "시스템 에어컨 (EHP - 전기)", type: "ehp", fuel: "electricity", desc: "실외기 하나에 여러 실내기를 연결하여 냉방합니다." },
-        { label: "시스템 에어컨 (GHP - 가스)", type: "ehp", fuel: "natural_gas", desc: "가스를 연료로 사용하여 냉방합니다." },
-        { label: "개별 에어컨 (가정용)", type: "split", fuel: "electricity", desc: "개별 실외기와 실내기가 1:1 또는 소규모로 연결됩니다." },
+        { label: "시스템 에어컨 (EHP - 전기)", type: "ehp", energyCarrier: "electricity", heatSource: "outdoor_air", desc: "실외기 하나에 여러 실내기를 연결하여 냉방합니다." },
+        { label: "시스템 에어컨 (GHP - 가스)", type: "ehp", energyCarrier: "natural_gas", heatSource: "outdoor_air", desc: "가스를 연료로 사용하여 냉방합니다." },
+        { label: "개별 에어컨 (가정용)", type: "split", energyCarrier: "electricity", heatSource: "outdoor_air", desc: "개별 실외기와 실내기가 1:1 또는 소규모로 연결됩니다." },
     ],
     district: [
-        { label: "지역 냉방", type: "compression_chiller", fuel: "district_heating", desc: "지역난방 열원을 이용한 흡수식 냉동이나 지역 냉수 공급을 의미합니다." },
+        { label: "지역 냉방", type: "compression_chiller", energyCarrier: "district_heating", desc: "지역난방 열원을 이용한 흡수식 냉동이나 지역 냉수 공급을 의미합니다." },
     ]
 };
 
 export function GeneratorSelection({ form, mode }: GeneratorSelectionProps) {
     // Current Values
     const currentType = form.watch("generator.type");
-    const currentFuel = form.watch("generator.fuel");
+    const currentCarrier = form.watch("generator.energyCarrier");
+    const currentHeatSource = form.watch("generator.heatSource");
 
-    // Infer current method based on type/fuel
+    // Infer current method based on type/carrier
     const inferMethod = (): string => {
         if (["ehp", "split"].includes(currentType)) return "refrigerant";
         if (currentType === "district") return "district";
         if (mode === "HEATING") {
-            if (currentType === "electric" && currentFuel === "electricity") {
+            if (currentType === "electric" && currentCarrier === "electricity") {
                 return "hydronic";
             }
         }
         if (mode === "COOLING") {
-            if (currentFuel === "district_heating") return "district";
+            if (currentCarrier === "district_heating") return "district";
         }
         return "hydronic"; // Default
     };
@@ -107,7 +108,7 @@ export function GeneratorSelection({ form, mode }: GeneratorSelectionProps) {
         if (inferred !== method) {
             // setMethod(inferred);
         }
-    }, [currentType, currentFuel]);
+    }, [currentType, currentCarrier]);
 
     const OPTIONS_MAP = mode === "HEATING" ? HEATING_OPTIONS : COOLING_OPTIONS;
 
@@ -116,21 +117,27 @@ export function GeneratorSelection({ form, mode }: GeneratorSelectionProps) {
         const defaultOption = (OPTIONS_MAP as any)[newMethod][0];
         if (defaultOption) {
             form.setValue("generator.type", defaultOption.type);
-            form.setValue("generator.fuel", defaultOption.fuel);
+            form.setValue("generator.energyCarrier", defaultOption.energyCarrier);
+            form.setValue("generator.heatSource", defaultOption.heatSource);
         }
     };
 
     const handleSourceChange = (val: string) => {
-        const [t, f] = val.split(":");
+        const [t, ec, hs] = val.split(":");
         form.setValue("generator.type", t);
-        form.setValue("generator.fuel", f);
+        form.setValue("generator.energyCarrier", ec);
+        form.setValue("generator.heatSource", hs || undefined);
     };
 
     const sourceOptions = (OPTIONS_MAP as any)[method] || [];
-    const currentSourceValue = `${currentType}:${currentFuel}`;
+    const currentSourceValue = `${currentType}:${currentCarrier}${currentHeatSource ? `:${currentHeatSource}` : ""}`;
 
     // Helper to get description for current selection
-    const currentSourceDesc = sourceOptions.find((o: any) => `${o.type}:${o.fuel}` === currentSourceValue)?.desc;
+    const currentSourceDesc = sourceOptions.find((o: any) =>
+        o.type === currentType &&
+        o.energyCarrier === currentCarrier &&
+        (o.heatSource === currentHeatSource || (!o.heatSource && !currentHeatSource))
+    )?.desc;
 
     return (
         <TooltipProvider delayDuration={300}>
@@ -192,7 +199,10 @@ export function GeneratorSelection({ form, mode }: GeneratorSelectionProps) {
                         </FormControl>
                         <SelectContent>
                             {sourceOptions.map((opt: any, idx: number) => (
-                                <SelectItem key={idx} value={`${opt.type}:${opt.fuel}`}>
+                                <SelectItem
+                                    key={idx}
+                                    value={`${opt.type}:${opt.energyCarrier}${opt.heatSource ? `:${opt.heatSource}` : ""}`}
+                                >
                                     {opt.label}
                                 </SelectItem>
                             ))}

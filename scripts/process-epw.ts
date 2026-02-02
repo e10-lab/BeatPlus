@@ -1,14 +1,13 @@
-
 import fs from 'fs';
 import path from 'path';
 import { HourlyClimate, MonthlyClimate } from '../src/engine/types';
 
-// Constants
+// 상수 정의
 const EPW_DIR = path.join(process.cwd(), 'epw');
 const OUTPUT_DIR = path.join(process.cwd(), 'public', 'weather-data');
 const METADATA_FILE = path.join(process.cwd(), 'src', 'lib', 'stations.json');
 
-// Interface for Station Metadata
+// 관측소 메타데이터 인터페이스
 interface StationMetadata {
     id: number;
     name: string;
@@ -20,13 +19,13 @@ interface StationMetadata {
     monthlySolar: number[];
 }
 
-// Function to parse a single EPW file
+// 단일 EPW 파일을 파싱하는 함수
 function parseEpw(filePath: string, filename: string): { metadata: StationMetadata, hourly: HourlyClimate[], monthly: MonthlyClimate[] } {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split('\n');
 
-    // 1. Parse Location Header (Line 1)
-    // LOCATION,Seoul.WS,SO,KOR,SRC-TMYx,471080,37.57140,126.9658,9.0,87.1
+    // 1. 위치 헤더 파싱 (첫 번째 줄)
+    // 예: LOCATION,Seoul.WS,SO,KOR,SRC-TMYx,471080,37.57140,126.9658,9.0,87.1
     const locLine = lines[0].split(',');
     const name = locLine[1];
     const id = parseInt(locLine[5]);
@@ -42,9 +41,9 @@ function parseEpw(filePath: string, filename: string): { metadata: StationMetada
         longitude,
         elevation,
         filename
-    } as any; // Cast for partial init
+    } as any; // 부분 초기화를 위해 any 타입 캐스팅
 
-    // 2. Parse Data (Line 9 onwards)
+    // 2. 기상 데이터 파싱 (9번째 줄부터 시작)
     const hourly: HourlyClimate[] = [];
     const monthlyAcc: { [key: number]: { tempSum: number, solarSum: number, count: number } } = {};
 
@@ -55,43 +54,26 @@ function parseEpw(filePath: string, filename: string): { metadata: StationMetada
         if (!line) continue;
 
         const cols = line.split(',');
-        // Standard EPW often has headers or comments interspersed, but usually strictly data after DATA PERIODS
-        // Check if numeric
+        // 숫자가 아닌 라인은 건너뜀 (헤더나 설명글 등)
         if (isNaN(parseInt(cols[0]))) continue;
 
         const month = parseInt(cols[1]);
         const day = parseInt(cols[2]);
         const hour = parseInt(cols[3]);
 
-        // EPW Columns (check valid doc or file inspection)
-        // 6: Dry Bulb (C)
-        // 13: Global Horizontal (Wh/m2)
-        // 14: Direct Normal (Wh/m2)
-        // 15: Diffuse Horizontal (Wh/m2)
+        // EPW 데이터 열 인덱스 참조:
+        // 6: 건구 온도 (Dry Bulb, °C)
+        // 13: 수평면 전일사량 (Global Horizontal, Wh/m²)
+        // 14: 법선 직달 일사량 (Direct Normal, Wh/m²)
+        // 15: 수평면 확산 일사량 (Diffuse Horizontal, Wh/m²)
 
         const Te = parseFloat(cols[6]);
-        const I_gh = parseFloat(cols[13]); // Global Horizontal
-        const I_dn = parseFloat(cols[14]); // Direct Normal
-        const I_dh = parseFloat(cols[15]); // Diffuse Horizontal
+        const I_gh = parseFloat(cols[13]); // 수평면 전일사량
+        const I_dn = parseFloat(cols[14]); // 법선 직달 일사량 (Direct Normal)
+        const I_dh = parseFloat(cols[15]); // 수평면 확산 일사량 (Diffuse Horizontal)
 
-        // Fallback or Checks
-        // 5R1C Engine expects I_beam and I_diff (Horizontal or Normal?)
-        // Solar Calc usually expects Global Horizontal (to split) OR Beam+Diffuse Horizontal.
-        // My calculateHourlyRadiation logic:
-        // If I use 'I_beam' and 'I_diff', usually implying Horizontal components or Normal Beam + Horizontal Diffuse.
-        // Let's look at `solar-calc.ts` later. Usually EPW gives Direct Normal (I_dn) and Diffuse Horizontal (I_dh).
-        // Global Horizontal (I_gh) ~ I_dn * sin(h) + I_dh.
-
-        // Storing generic values. Let's store DN and DH as 'beam' and 'diff' for now, or explicit fields.
-        // My `HourlyClimate` interface has `I_beam` and `I_diff`.
-        // Let's assume I_beam means Direct Normal Radiation (Solar calc usually projects this).
-        // OR does it mean Horizontal Beam?
-        // Checking `types.ts`: I_beam: number; // Beam Irradiance (W/m2)
-        // Checking `solar-calc.ts` usage:
-        // It likely projects beam. 
-        // Best practice: Store Direct Normal as beam, Diffuse Horizontal as diff.
-        // Note: EPW units are Wh/m2 (Energy per hour) -> effectively W/m2 for hourly steps.
-
+        // HourlyClimate 인터페이스에 맞춰 데이터 저장
+        // I_beam은 법선 직달 일사량(Direct Normal), I_diff는 수평면 확산 일사량으로 설정
         hourly.push({
             hourOfYear,
             month,
@@ -100,24 +82,15 @@ function parseEpw(filePath: string, filename: string): { metadata: StationMetada
             Te,
             I_beam: I_dn,
             I_diff: I_dh,
-            // SunPos will be calculated by the engine on the fly or we can pre-calc? 
-            // Engine calculates it based on lat/lon/time. 
-            // BUT `HourlyClimate` type has sunAltitude/sunAzimuth.
-            // If I leave them 0, does the engine recalc them?
-            // `generateHourlyClimateData` was strictly creating them.
-            // If I load from EPW, I might need to compute them OR let the engine do it.
-            // `calculator.ts` logic needs to be checked. 
-            // If `calculator.ts` computes sun pos internally, we are good.
-            // If it expects them in input, we need to generate them.
-            // Let's verify `calculator.ts` later. For now, I'll pass 0.
+            // 태양 위치는 엔진에서 런타임에 계산하므로 초기값은 0으로 설정
             sunAltitude: 0,
             sunAzimuth: 0
         });
 
-        // Monthly Stats Accumulation
+        // 월별 통계 집계
         if (!monthlyAcc[month]) monthlyAcc[month] = { tempSum: 0, solarSum: 0, count: 0 };
         monthlyAcc[month].tempSum += Te;
-        monthlyAcc[month].solarSum += (I_gh); // Global Horizontal for monthly total check
+        monthlyAcc[month].solarSum += (I_gh); // 월별 합계를 위해 수평면 전일사량 합산
         monthlyAcc[month].count++;
 
         hourOfYear++;
@@ -136,7 +109,7 @@ function parseEpw(filePath: string, filename: string): { metadata: StationMetada
             monthly.push({
                 month: m,
                 Te: avgTemp,
-                // Monthly Total Solar (kWh/m2/month) = Sum(Wh/m2) / 1000
+                // 월간 수평면 전일사량 (Wh/m² -> kWh/m²/month)
                 Is_Horiz: totalSolar
             });
             monthlyTemp.push(parseFloat(avgTemp.toFixed(1)));
@@ -153,7 +126,7 @@ function parseEpw(filePath: string, filename: string): { metadata: StationMetada
     return { metadata, hourly, monthly };
 }
 
-// Main Execution
+// 메인 실행 로직
 if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 }
@@ -161,14 +134,14 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 const files = fs.readdirSync(EPW_DIR).filter(f => f.endsWith('.epw'));
 const stations: StationMetadata[] = [];
 
-console.log(`Processing ${files.length} EPW files...`);
+console.log(`${files.length}개의 EPW 파일 처리를 시작합니다...`);
 
 for (const file of files) {
     try {
         const { metadata, hourly, monthly } = parseEpw(path.join(EPW_DIR, file), file);
         stations.push(metadata);
 
-        // Save Weather Data (Hourly + Monthly)
+        // 시간별 및 월별 기상 데이터 저장
         const weatherData = {
             ...metadata,
             monthly,
@@ -178,11 +151,11 @@ for (const file of files) {
         fs.writeFileSync(path.join(OUTPUT_DIR, `${metadata.id}.json`), JSON.stringify(weatherData));
         process.stdout.write('.');
     } catch (e) {
-        console.error(`\nError processing ${file}:`, e);
+        console.error(`\n파일 처리 오류 (${file}):`, e);
     }
 }
 
-// Save Metadata Registry
+// 관측소 메타데이터 레지스트리 저장
 fs.writeFileSync(METADATA_FILE, JSON.stringify(stations, null, 2));
 
-console.log(`\nDone. Processed ${stations.length} stations.`);
+console.log(`\n완료. 총 ${stations.length}개의 관측소 데이터가 처리되었습니다.`);

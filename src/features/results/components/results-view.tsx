@@ -7,6 +7,7 @@ import { loadClimateData } from "@/engine/climate-data";
 import { getProject } from "@/services/project-service";
 import { getZones } from "@/services/zone-service";
 import { getSurfaces } from "@/services/surface-service";
+import { getConstructions } from "@/services/construction-service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, Zap, Leaf, Factory, Sun } from "lucide-react";
 import { Zone } from "@/types/project";
@@ -37,8 +38,11 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                 // 1. Fetch Project for Weather Station
                 const project = await getProject(projectId);
 
-                // 2. Fetch Zones
-                const zones = await getZones(projectId);
+                // 2. Fetch Zones & Constructions
+                const [zones, constructions] = await Promise.all([
+                    getZones(projectId),
+                    getConstructions(projectId)
+                ]);
 
                 // 3. Fetch Surfaces for each Zone and build ZoneInput
                 const zoneInputs: ZoneInput[] = await Promise.all(
@@ -79,7 +83,8 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                     project?.ventilationConfig,
                     project?.ventilationUnits,
                     project?.automationConfig,
-                    project?.systems // Use systems from project
+                    project?.systems, // Use systems from project
+                    constructions
                 );
                 setResults(calcResults);
 

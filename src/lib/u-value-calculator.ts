@@ -126,8 +126,7 @@ const getWindowLookupValue = (layers: Layer[], fid: FrameType): number | null =>
 
     if (!tableSet) return null;
 
-    // @ts-ignore
-    const row = tableSet[typeKey];
+    const row = (tableSet as any)[typeKey];
     if (!row) return null;
 
     return pickValue(row, fid, minGap);

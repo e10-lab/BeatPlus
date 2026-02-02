@@ -8,7 +8,7 @@ const mockZone: ZoneInput = {
     id: 'zone-1',
     projectId: 'proj-1',
     name: 'Test Zone',
-    usageType: '1_single_office',
+    usageType: '1_office',
     area: 100,
     height: 3,
     volume: 300,
@@ -29,7 +29,8 @@ const mockWindow: Surface = {
     shgc: 0.6,
     shading: {
         hasDevice: false,
-        fcValue: 1.0 // No Shading
+        fcValue: 1.0, // No Shading
+        type: 'external'
     }
 };
 

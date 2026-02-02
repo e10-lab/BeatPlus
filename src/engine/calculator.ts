@@ -1,7 +1,7 @@
 
-import { DHWSystem, AHUSystem, HeatingSystem, CoolingSystem, LightingSystem, EnergySource } from "@/types/system";
+import { DHWSystem, AHUSystem, HeatingSystem, CoolingSystem, LightingSystem, EnergyCarrier } from "@/types/system";
 import { ZoneInput, CalculationResults, MonthlyResult, HourlyResult, ClimateData } from "./types";
-import { Project } from "@/types/project";
+import { Project, Construction } from "@/types/project";
 import { getClimateData, generateHourlyClimateData } from "./climate-data";
 import { calculateHourlyRadiation } from "./solar-calc";
 import { calculateLightingDemand } from "./lighting-calc";
@@ -11,13 +11,51 @@ import { calculateHourlyPV } from "./pv-calc";
 import { DIN_18599_PROFILES } from "@/lib/din-18599-profiles";
 import { PEF_FACTORS, CO2_FACTORS } from "@/lib/standard-values";
 
-// Physical Constants
-const HEAT_CAPACITY_AIR = 0.34; // Wh/(m³K) or 1200 J/(m³K) / 3600
+// 물리 상수
+const HEAT_CAPACITY_AIR = 0.34; // 공기의 비열 Wh/(m³K) (또는 1200 J/(m³K) / 3600)
 const STEFAN_BOLTZMANN = 5.67e-8;
 
 /**
- * ISO 52016-1:2017 5R1C Model Implementation
- * Calculates hourly energy demand for heating and cooling.
+ * 구조체의 레이어 정보를 바탕으로 실내측 유효 열용량(Wh/m²K)을 계산합니다.
+ * DIN V 18599-2 및 ISO 13786 기준을 참고합니다.
+ */
+export function calculateEffectiveThermalCapacity(construction: Construction): number {
+    if (!construction.layers || construction.layers.length === 0) return 0;
+
+    let totalKappa = 0; // [J/m²K]
+
+    // 외피 구성 레이어 (1부터 n까지, 외측에서 내측 순서)
+    // 열용량 산정 시에는 보통 실내측에서부터 유효한 질량을 합산합니다.
+    // layers 배열이 [외측 ... 내측] 순서이므로 역순(내측부터)으로 처리합니다.
+    const layers = [...construction.layers].reverse();
+
+    for (const layer of layers) {
+        const d = layer.thickness; // m
+        const rho = layer.density || 0; // kg/m³
+        const c = layer.specificHeat || 0; // J/kgK
+        const thermalCond = layer.thermalConductivity || 0;
+
+        // 단열재 레이어를 만나면 그 이후(더 바깥쪽) 레이어는 실내 열용량에 기여하지 않는 것으로 간주
+        // (간략법: 열전도율이 0.06 W/mK 이하인 경우 단열재로 간주)
+        if (thermalCond > 0 && thermalCond < 0.06) {
+            // 단열재의 절반 정도까지만 유효하다고 보는 경우도 있으나, 
+            // 여기서는 단열재 이전(내측) 레이어만 합산하는 보수적 방식을 채택합니다.
+            break;
+        }
+
+        totalKappa += (d * rho * c);
+
+        // 유효 깊이 제한 (보통 10cm(0.1m) 정도를 유효 두께로 봅니다.)
+        // 여기서는 모든 레이어를 합산하되, 단열재에서 차단되는 방식을 우선 적용합니다.
+    }
+
+    // J/m²K -> Wh/m²K (1 Wh = 3600 J)
+    return totalKappa / 3600;
+}
+
+/**
+ * ISO 52016-1:2017 5R1C 모델 구현
+ * 난방 및 냉방을 위한 시간당 에너지 소요량을 계산합니다.
  */
 export function calculateEnergyDemand(
     zones: ZoneInput[],
@@ -26,20 +64,18 @@ export function calculateEnergyDemand(
     ventilationConfig?: Project['ventilationConfig'],
     ventilationUnits?: Project['ventilationUnits'],
     automationConfig?: Project['automationConfig'],
-    systems?: Project['systems']
+    systems?: Project['systems'],
+    constructions?: Construction[]
 ): CalculationResults {
 
-    // 1. Prepare Weather Data
-    // Generates 8760 hours of Te, I_beam, I_diff, SunPos
-    // (In real app, select based on stationId, currently simplifed to Seoul/Default)
-    // 1. Prepare Weather Data
-    // Use provided weatherData or fallback to synthetic Seoul data
+    // 1. 기상 데이터 준비
+    // 제공된 기상 데이터를 사용하거나 서울 표준 기상 데이터(Synthetic)를 기본값으로 사용
     const climateBase = weatherData || getClimateData();
     const hourlyClimate = climateBase.hourly || generateHourlyClimateData(climateBase.monthly);
 
-    const projectHourlyResults: HourlyResult[] = []; // Aggregated project results if needed
+    const projectHourlyResults: HourlyResult[] = []; // 필요한 경우 집계된 프로젝트 결과 저장
 
-    // Initialize results structure
+    // 결과 구조 초기화 (각 존별 시간당 계산 수행)
     const zoneResults = zones.map(zone => {
         if (zone.isExcluded) return null;
 
@@ -50,11 +86,12 @@ export function calculateEnergyDemand(
             ventilationConfig,
             ventilationUnits,
             automationConfig,
-            systems
+            systems,
+            constructions
         );
     }).filter((r): r is NonNullable<typeof r> => r !== null);
 
-    // Aggregate Yearly Results
+    // 연간 결과 집계
     const totalHeating = zoneResults.reduce((sum, z) => sum + z.yearly.heatingDemand, 0);
     const totalCooling = zoneResults.reduce((sum, z) => sum + z.yearly.coolingDemand, 0);
     const totalLighting = zoneResults.reduce((sum, z) => sum + z.yearly.lightingDemand, 0);
@@ -62,8 +99,7 @@ export function calculateEnergyDemand(
     const totalAux = zoneResults.reduce((sum, z) => sum + z.yearly.auxDemand, 0);
     const totalArea = zoneResults.reduce((sum, z) => sum + z.yearly.totalArea, 0);
 
-    // Aggregate Monthly Results (for project total charts)
-    // Simply summing up zone monthlies
+    // 월간 결과 집계 (프로젝트 전체 차트용)
     const projectMonthlyResults: MonthlyResult[] = [];
     for (let m = 1; m <= 12; m++) {
         projectMonthlyResults.push({
@@ -81,27 +117,26 @@ export function calculateEnergyDemand(
             Q_lighting: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Q_lighting || 0), 0),
             Q_dhw: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Q_dhw || 0), 0),
             Q_aux: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.Q_aux || 0), 0),
-            // PV Placeholders (aggregated later)
+            // 태양광 발전 (나중에 집계)
             pvGeneration: 0,
             selfConsumption: 0,
 
-            // Averages need area weighting
-            gamma: 0, eta: 0, // Not strictly applicable to sum
+            // 평균값 산출 (면적 가중 평균)
+            gamma: 0, eta: 0,
             avg_Ti: zoneResults.reduce((s, z) => s + (z.monthly.find(zm => zm.month === m)?.avg_Ti || 0) * z.yearly.totalArea, 0) / totalArea
         });
     }
 
-    // --- PV Calculation (DIN 18599-9) ---
-    // Find shared PV systems or assume Project level
+    // --- 태양광 발전 계산 (DIN 18599-9) ---
+    // 공유 태양광 시스템이 있는지 확인하거나 프로젝트 레벨로 가정
     const pvSystems = systems?.filter(s => s.type === "PV") as import("@/types/system").PVSystem[] | undefined;
 
     let totalPVGen_Wh = 0;
     const hourlyPVGen: number[] = new Array(8760).fill(0);
 
     if (pvSystems && pvSystems.length > 0) {
-        // Calculate generation for each system
-        // Latitude default 37.5
-        const lat = 37.5; // Fixed for now, should come from project location
+        // 각 시스템별 발전량 계산
+        const lat = 37.5; // 서울 위도 (향후 프로젝트 위치 정보에서 가져와야 함)
 
         pvSystems.forEach(sys => {
             const res = calculateHourlyPV(sys, hourlyClimate, lat);
@@ -113,9 +148,9 @@ export function calculateEnergyDemand(
     }
 
     const pvGen_kWh = totalPVGen_Wh / 1000;
-    const pvCredit = pvGen_kWh * 2.75; // PEF for displaced electricity
+    const pvCredit = pvGen_kWh * PEF_FACTORS.electricity; // 에너지원별 가중치(PEF) 적용 (전력 기준)
 
-    // Aggregate Yearly Final/Primary
+    // 연간 최종 에너지 및 1차 에너지 집계
     let sumFinalHeating = 0;
     let sumFinalCooling = 0;
     let sumFinalDHW = 0;
@@ -151,17 +186,12 @@ export function calculateEnergyDemand(
     });
 
     const totalPrimary = sumPrimaryHeating + sumPrimaryCooling + sumPrimaryDHW + sumPrimaryLighting + sumPrimaryAux - pvCredit;
-    const totalCO2WithPV = sumCO2 - (pvGen_kWh * 0.466); // Credit CO2
+    const totalCO2WithPV = sumCO2 - (pvGen_kWh * 0.466); // PV 발전에 의한 탄소 배출 감소분
 
     return {
         zones: zoneResults,
         monthly: projectMonthlyResults.map(m => {
-            // Simple distribution of PV for monthly chart approx
-            // In real logic, we should sum hourlyPVGen for the month
-            // Let's do simple ratio for now to populate the field
-            const r = m.QS / (zoneResults.reduce((s, z) => s + z.yearly.dhwDemand * 0 + z.yearly.heatingDemand * 0 + 1, 0) * 0 + 1); // logic broken
-            // Better:
-            // Aggregating actual PV
+            // 월간 차트용 PV 발전량 합산
             return {
                 ...m,
                 pvGeneration: totalPVGen_Wh > 0 ? (pvGen_kWh / 12) : 0,
@@ -178,9 +208,9 @@ export function calculateEnergyDemand(
             specificHeatingDemand: totalArea > 0 ? totalHeating / totalArea : 0,
             specificCoolingDemand: totalArea > 0 ? totalCooling / totalArea : 0,
 
-            // PV
+            // 태양광
             pvGeneration: pvGen_kWh,
-            selfConsumption: pvGen_kWh, // Assume Net Metering 
+            selfConsumption: pvGen_kWh, // 넷 미터링 가정
             pvExport: 0,
 
             finalEnergy: {
@@ -206,39 +236,62 @@ export function calculateEnergyDemand(
 
 function calculateZoneHourly(
     zone: ZoneInput,
-    weather: any[], // HourlyClimate[]
+    weather: any[], // 시간당 기상 데이터 (HourlyClimate[])
     mainStructure?: string,
     ventilationConfig?: Project['ventilationConfig'],
     ventilationUnits?: Project['ventilationUnits'],
     automationConfig?: Project['automationConfig'],
-    systems?: Project['systems']
+    systems?: Project['systems'],
+    constructions?: Construction[]
 ) {
     const Area = zone.area;
-    const Volume = Area * zone.height * 0.95; // Net volume
+    const Volume = Area * zone.height * 0.95; // 순 체적
     const profile = DIN_18599_PROFILES[zone.usageType] || DIN_18599_PROFILES["residential_single"];
 
-    // --- A. Model Parameters (RC Network) ---
-    // 1. Thermal Mass (Cm)
-    let Cm_factor = 50; // default Wh/(m2K)
-    if (mainStructure) {
-        if (mainStructure.includes("철근콘크리트") || mainStructure.includes("조적")) Cm_factor = 90; // Heavy
-        else if (mainStructure.includes("철골") || mainStructure.includes("목구조")) Cm_factor = 50; // Light
+    // --- A. 모델 파라미터 (RC 네트워크) ---
+    // 1. 열용량 (Cm)
+    let Cm_factor = 50; // 기본값 Wh/(m²K)
+
+    // 구조체 레이어 기반 정밀 계산 시도
+    let calculatedCmSum = 0;
+    let hasLayerData = false;
+
+    if (constructions && constructions.length > 0) {
+        zone.surfaces.forEach(surf => {
+            if (surf.constructionId) {
+                const cons = constructions.find(c => c.id === surf.constructionId);
+                if (cons && cons.layers && cons.layers.length > 0) {
+                    const kappa = calculateEffectiveThermalCapacity(cons);
+                    calculatedCmSum += (kappa * surf.area);
+                    hasLayerData = true;
+                }
+            }
+        });
     }
-    const Cm = (zone.thermalCapacitySpecific || Cm_factor) * Area; // [Wh/K]
 
-    // 2. Transmission Coefficients (H_tr)
-    // Split into op (opaque) and w (window)
-    let H_tr_op = 0; // Opaque elements
-    let H_tr_w = 0;  // Windows
-    let Area_m = 0; // Effective mass area (usually internal surface area). Approx 2.5 * Af
+    if (mainStructure && !hasLayerData) {
+        if (mainStructure.includes("철근콘크리트") || mainStructure.includes("조적")) Cm_factor = 90; // 중량 구조
+        else if (mainStructure.includes("철골") || mainStructure.includes("목구조")) Cm_factor = 50; // 경량 구조
+    }
 
-    // Calculate H_tr
+    // 우선순위: 수동 입력 > 레이어 기반 계산 > 구조별 기본 계수
+    const Cm = zone.thermalCapacitySpecific ? (zone.thermalCapacitySpecific * Area) :
+        hasLayerData ? calculatedCmSum :
+            (Cm_factor * Area); // [Wh/K]
+
+    // 2. 전열 계수 (H_tr)
+    // 불투명 외피(op)와 창호(w)로 분리
+    let H_tr_op = 0; // 불투명 요소
+    let H_tr_w = 0;  // 창호
+    let Area_m = 0; // 유효 질량 면적 (보통 내부 표면적). 약 2.5 * Af
+
+    // H_tr 계산
     zone.surfaces.forEach(surf => {
         let u = surf.uValue;
         let a = surf.area;
         let fx = 1.0;
 
-        // Temperature reduction factors
+        // 온도 보정 계수
         if (surf.type.includes("ground")) fx = 0.6;
         else if (surf.type.includes("interior")) fx = 0.5;
         else if (surf.orientation === "NoExposure") fx = 0.0;
@@ -252,67 +305,102 @@ function calculateZoneHourly(
         }
     });
 
-    // Thermal Bridge
+    // 열교 계산
     const H_tb = zone.surfaces.reduce((acc, s) => acc + s.area, 0) * (zone.thermalBridgeMode || 0.1);
     H_tr_op += H_tb;
 
-    // Derived 5R1C Parameters (ISO 52016-1 ANNEX B)
-    // Assumption: Class I (Medium) integration
-    // Am: Effective mass area. Usually total internal surface area.
-    // Simplified: Am = 4.5 * Area (Total internal surface area approx) or simplified per ISO.
-    // Let's use Am = 2.5 * A_floor for calculation of H_tr_ms check?
-    // ISO standard defines Am based on Cm logic.
-    const Am = Cm / 25; // if Cm [Wh/K] ~ J/K / 3600. 
-    // ISO: Cm [J/K] = area * heat_capacity_periodic.
-    // Here Cm is Wh/K.
+    // ISO 52016-1(또는 DIN 18599-2)의 단순 시간별 계산법(5R1C) 파라미터 도출
+    // Am: 유효 질량 면적 (Effective Mass Area, [m²])
+    // ISO 52016-1 Annex B에 따라 Cm / 25로 산출.
+    // 숫자 '25'는 구조체의 표준 단위 열용량인 25 Wh/(m²·K) (90,000 J/m²K)를 의미함.
+    const Am = Cm / 25;
 
-    // Coupling conductances
-    const h_ic = 3.45; // Convective heat transfer coefficient internal [W/m2K]
-    const h_rs = 5.13; // Radiative heat transfer coefficient [W/m2K]
+    // --- 한국 기준 R_si 반영 로직 ---
+    // 벽체(0.11), 지붕(0.086), 바닥(0.086) 등 부위별로 다른 내부 열전달저항의 가중평균 산출
+    let totalAreaOp = 0;
+    let sumRsiArea = 0;
 
-    const H_tr_ms = 9.1 * Am; // Coupling mass-surface [W/K] (Standard value approx)
-    const H_tr_em = 1 / (1 / H_tr_op - 1 / (h_rs + h_ic) * Am); // External part? 
-    // Simplified ISO 52016 model mapping:
-    // H_tr_em: Transmission external (walls)
-    // H_tr_w: Transmission windows (light)
-    // H_tr_is: Air to Surface = h_is * A_tot = 3.45 * 4.5 * Area?
-    // Let's use the explicit ISO formulas:
-    const Atot = 4.5 * Area; // Total internal area
-    const H_tr_is = h_ic * Atot;
+    zone.surfaces.forEach(s => {
+        if (s.type !== 'window' && s.type !== 'door') {
+            // 기본값 (벽체 0.11)
+            let rsi = 0.11;
 
-    // 3. Ventilation (H_ve) - Variable hourly?
-    // We calculate base parameters.
-    const n50 = ventilationConfig?.n50 ?? 2.0; // infiltration
+            // Construction 정보가 있으면 해당 값 사용, 없으면 부위별 표준값 적용
+            const cons = constructions?.find(c => c.id === s.constructionId);
+            if (cons) {
+                rsi = cons.r_si;
+            } else {
+                if (s.type.includes('roof')) rsi = 0.086;
+                else if (s.type.includes('floor')) rsi = 0.086;
+                else rsi = 0.11;
+            }
+
+            sumRsiArea += rsi * s.area;
+            totalAreaOp += s.area;
+        }
+    });
+
+    // 구역 평균 내부 열전달저항 (R_si)
+    const avgRsi = totalAreaOp > 0 ? sumRsiArea / totalAreaOp : 0.11;
+    // 전체 내부 열전달 계수 (h_is = 1 / R_si)
+    const h_is_total = 1 / avgRsi;
+
+    // ISO 52016-1의 대류(3.45)/복사(5.13) 비율(약 4:6)을 유지하며 한국 기준 h_is를 분해
+    const h_ic = h_is_total * (3.45 / 8.58); // 내부 대류 열전달 계수 [W/m²K]
+    const h_rs = h_is_total * (5.13 / 8.58); // 내부 복사 열전달 계수 [W/m²K]
+
+    // --- 5R1C 모델 상수 사전 계산 ---
+    // Atot: 실내 총 내부 표면적 (천장, 바닥, 내벽 등 공기와 접촉하는 모든 표면)
+    // 표준적인 주거/사무 공간의 경험적 계수 4.5를 적용 (ISO 52016-1 기준)
+    const Atot = 4.5 * Area;
+
+    // H_tr_ms: 질량 노드(Mass)와 표면 노드(Surface) 간의 열전달 계수 [W/K]
+    // 9.1은 ISO 52016-1에서 규정한 단위 면적당 질량-표면 결합 계수 (9.1 W/m²K)
+    const H_tr_ms = 9.1 * Am;
+    const H_tr_is = h_ic * Atot; // 공기-표면 결합 계수 [W/K]
+
+    // G2: 공기 노드와 질량 노드 사이의 유효 결합 계수 (직렬 연결)
+    const G2 = (H_tr_is * H_tr_ms) / (H_tr_is + H_tr_ms);
+    // factor_st: 표면 노드로 유입된 열량(일사 등)이 공기 노드로 배분되는 비율
+    const factor_st = H_tr_is / (H_tr_is + H_tr_ms);
+
+    // H_tr_em: 구조체 전열 계수에서 내부 표면 저항(avgRsi) 성분을 제거한 순수 전도+외부저항 성분
+    const R_total_op = 1 / H_tr_op;
+    const R_ms_coupling = 1 / ((h_rs + h_ic) * Am);
+    const H_tr_em = R_total_op > R_ms_coupling ? 1 / (R_total_op - R_ms_coupling) : H_tr_op;
+
+    // 3. 환기 (H_ve)
+    const n50 = ventilationConfig?.n50 ?? 2.0; // 침기율
     const e_shield = 0.07;
-    const f_inf_base = n50 * e_shield; // 1/h
+    const f_inf_base = n50 * e_shield; // [1/h]
 
-    // --- B. Hourly Loop State ---
+    // --- B. 시간당 루프 상태 ---
     const hourlyResults: HourlyResult[] = [];
-    let theta_m_prev = 20.0; // Initial mass temp estimate
+    let theta_m_prev = 20.0; // 초기 질량 온도 추정치
 
-    // Result accumulators
+    // 결과 누계용
     let sum_Qh = 0;
     let sum_Qc = 0;
-    let sum_Ql = 0; // Lighting
-    let sum_Qw = 0; // DHW (Water)
-    let sum_Qaux = 0; // Auxiliary (Fans)
+    let sum_Ql = 0; // 조명
+    let sum_Qw = 0; // 급탕
+    let sum_Qaux = 0; // 부속 기기 (팬 등)
 
-    // Monthly aggregators
+    // 월간 집계용
     const monthlyAggs = Array(12).fill(null).map(() => ({
         QT: 0, QV: 0, Qloss: 0, QS: 0, QI: 0, Qgain: 0, Qh: 0, Qc: 0, Q_lighting: 0, Q_dhw: 0, Q_aux: 0,
         tempSum: 0, count: 0
     }));
 
-    // Iterate 8760 hours
+    // 8760시간 반복 계산
     for (const hrData of weather) {
         const h = hrData.hourOfYear;
         const Te = hrData.Te;
 
-        // 1. Ventilation Rate (Current Hour)
-        // Dynamic Occupancy Logic
+        // 1. 환기율 (현재 시간)
+        // 동적 재실 로직
         const isFiveDayWeek = profile.annualUsageDays <= 260;
         const dayOfYear = Math.ceil(hrData.hourOfYear / 24);
-        const dayOfWeek = ((dayOfYear - 1) % 7) + 1; // 1=Mon, ... 7=Sun (Simplified assumption: Jan 1 is Mon)
+        const dayOfWeek = ((dayOfYear - 1) % 7) + 1; // 1=월, ... 7=일 (1월 1일이 월요일이라고 가정)
 
         let isWorkingDay = true;
         if (isFiveDayWeek) {
@@ -323,25 +411,25 @@ function calculateZoneHourly(
         const isOccupiedTime = localHour >= profile.usageHoursStart && localHour < profile.usageHoursEnd;
         const isOccupied = isWorkingDay && isOccupiedTime;
 
-        // Infiltration (Always present to some degree)
+        // 침기 (항상 일정 수준 존재)
         const infRate = f_inf_base;
 
-        // Operational Ventilation
+        // 운전 환기
         let operAirEx = 0;
-        let heatRecoveryFactor = 0; // 0 = No recovery (100% loss), 1 = Perfect recovery
-        let fanPowerWatts = 0; // Auxiliary fan power
+        let heatRecoveryFactor = 0; // 0 = 회수 없음 (100% 손실), 1 = 완벽한 회수
+        let fanPowerWatts = 0; // 부속 팬 전력
 
         if (isOccupied) {
-            // Check Mechanical Ventilation
-            // 1. Check for linked AHU Systems
+            // 기계 환기 확인
+            // 1. 연결된 공조기(AHU) 시스템 확인
             const ahuSystem = systems?.find(s => s.type === "AHU" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as AHUSystem | undefined;
 
-            // 2. Check for Ventilation Units (Legacy/Separate)
+            // 2. 개별 환기 장치 확인
             const isVentUnit = (zone.linkedVentilationUnitIds && zone.linkedVentilationUnitIds.length > 0);
 
             const isMechanical = !!ahuSystem || isVentUnit;
 
-            // DIN 18599-10 Operation Factors (F_A,RLT & F_Te,RLT)
+            // DIN 18599-10 운전 계수 (F_A,RLT 및 F_Te,RLT)
             const F_A_RLT = profile.hvacAbsenceFactor || 0;
             const F_Te_RLT = profile.hvacPartialOperationFactor ?? 1.0;
             const effectiveFactor = (1 - F_A_RLT) * F_Te_RLT;
@@ -349,80 +437,75 @@ function calculateZoneHourly(
             if (isMechanical) {
                 let eff = 0;
 
-                // Priority: AHU -> Vent Units -> Config
+                // 우선순위: AHU -> 환기 장치 -> 프로젝트 설정
                 if (ahuSystem && ahuSystem.heatRecovery) {
-                    // Decide which efficiency to use based on outdoor temperature
-                    // If Te is lower than the heating setpoint (or midpoint), use heating efficiency
+                    // 외기 온도에 따라 가열/냉각 효율 결정
                     const midpoint = (zone.temperatureSetpoints.heating + zone.temperatureSetpoints.cooling) / 2;
                     eff = Te < midpoint ? ahuSystem.heatRecovery.heatingEfficiency : ahuSystem.heatRecovery.coolingEfficiency;
                 } else if (isVentUnit && ventilationUnits) {
-                    // Find effective Heat Recovery Efficiency
+                    // 유효 열회수 효율 계산
                     const activeUnits = ventilationUnits.filter(u => zone.linkedVentilationUnitIds?.includes(u.id));
                     if (activeUnits.length > 0) {
                         const totalFlow = activeUnits.reduce((sum, u) => sum + (u.supplyFlowRate || 0), 0);
                         if (totalFlow > 0) {
-                            // Weighted average efficiency
+                            // 가중 평균 효율
                             const weightedEff = activeUnits.reduce((sum, u) => sum + (u.supplyFlowRate || 0) * (u.heatRecoveryEfficiency || 0), 0);
-                            eff = (weightedEff / totalFlow) / 100; // % to 0-1
+                            eff = (weightedEff / totalFlow) / 100; // %를 0-1 소수로 변환
                         } else {
-                            // Fallback if rates are 0
                             eff = (activeUnits[0].heatRecoveryEfficiency || 0) / 100;
                         }
                     }
                 }
 
-                // Fallback to Project Config if no units linked (but mode is mechanical?)
-                // Or if we are using the 'ventilationConfig' passed from Project
                 if (eff === 0 && ventilationConfig?.type === 'mechanical') {
                     eff = (ventilationConfig.heatRecoveryEfficiency || 0) / 100;
                 }
 
                 heatRecoveryFactor = eff;
 
-                // Mechanical Air Exchange Rate
-                // If units define flow: Use unit flow.
-                // Otherwise use Profile Minimum.
-                // For now, adhere to Profile Requirement as Demand.
-                // Apply Operation Factors to Flow Rate or Operation Time.
-                // Physically, it reduces average flow rate.
+                // 기계 환기 횟수 계산
                 const reqFlow = profile.minOutdoorAirFlow ? (profile.minOutdoorAirFlow * Area) : (Volume * 0.5);
                 operAirEx = (reqFlow * effectiveFactor) / Volume;
 
-                // Fan Power Calculation
-                let sfp = 1.5; // Default SFP W/(m3/h)
+                // 팬 전력 계산
+                let sfp = 1.5; // 기본 SFP W/(m³/h)
                 if (ahuSystem) {
                     sfp = ahuSystem.fanPower || 1.5;
                 }
-                // Fan runs for required flow
-                // Power (W) = SFP (W/(m3/h)) * Flow (m3/h)
-                // Fan power also reduced by effective flow? Yes, VSD assumed or simple average.
                 fanPowerWatts = sfp * reqFlow * effectiveFactor;
 
             } else {
-                // Natural Ventilation
-                // Profile defines required air exchange
+                // 자연 환기
                 const reqFlow = profile.minOutdoorAirFlow ? (profile.minOutdoorAirFlow * Area) : (Volume * 0.5);
                 operAirEx = reqFlow / Volume;
                 heatRecoveryFactor = 0;
             }
+
+            // --- 외기 냉방 (Free Cooling) 로직 ---
+            // 냉방기이고 외기 온도가 충분히 낮으면 환기량을 늘림
+            if (Te < (profile.coolingSetpoint - 2) && isOccupied) {
+                const boostACH = 5.0; // 외기 냉방을 위해 5 ACH로 증대
+                const boostFlow = boostACH * Volume;
+                const currentFlow = operAirEx * Volume;
+                if (boostFlow > currentFlow) {
+                    operAirEx = boostFlow / Volume;
+                    // 외기 냉방 시에는 열회수를 우회(Bypass)함
+                    heatRecoveryFactor = 0;
+                }
+            }
         }
 
-        // Total Air Exchange & Heat Coefficient
-        // H_ve = Rho*Cp * Volume * (Infiltration + (1-eta)*Ventilation)
-        // Note: Infiltration is usually added.
+        // 총 환기율 및 환기 열전달 계수 계산
         const H_ve = Volume * HEAT_CAPACITY_AIR * (infRate + operAirEx * (1 - heatRecoveryFactor));
 
 
-        // 2. Solar Gains (Phi_sol)
+        // 2. 일사 획득 (Phi_sol)
         let Phi_sol = 0;
-        // Iterate surfaces
         zone.surfaces.forEach(surf => {
             if (surf.orientation === "NoExposure" || surf.type.includes("interior")) return;
 
-            // Geometry
-            let azimuth = 0; // S=0
-            // Azimuth: South=0, East=-90, West=90, North=180
-            // Map string to degrees
+            // 방위각 설정 (남=0, 동=-90, 서=90, 북=180)
+            let azimuth = 0;
             switch (surf.orientation) {
                 case 'S': azimuth = 0; break;
                 case 'E': azimuth = -90; break;
@@ -439,26 +522,25 @@ function calculateZoneHourly(
             const I_tot = calculateHourlyRadiation(
                 hrData.I_beam, hrData.I_diff,
                 hrData.day, hrData.hour,
-                37.5, // Seoul Lat
+                37.5, // 서울 위도
                 azimuth, tilt
             );
 
-            // Shading & SHGC
+            // 차양 및 SHGC 반영
             let gain = 0;
             if (surf.type === 'window' || surf.type === 'door') {
                 const shgc = surf.shgc ?? 0.6;
-                const ff = 0.7; // Frame factor
+                const ff = 0.7; // 프레임 계수
 
-                // Dynamic Shading (Simplified)
-                // If I_tot > 300 W/m2, assume blinds used (Fc = 0.5)? 
-                // For now keep static 0.9 as defined in previous step, but mark for future.
-                const shadingFactor = 0.9;
+                // 동적 차양 (DIN/TS 18599-2)
+                let shadingFactor = 1.0;
+                if (surf.shading?.hasDevice) {
+                    shadingFactor = surf.shading.fcValue ?? 0.9;
+                }
 
                 gain = I_tot * surf.area * shgc * ff * shadingFactor;
             } else {
-                // Opaque: alpha * I * U / h_out? 
-                // Sol-air temp approach is better.
-                // Simplified: Phi_sol_opaque = alpha * R_se * U * A * I_tot
+                // 불투명 외피: 간략화된 일사 흡수 계산
                 const alpha = surf.absorptionCoefficient ?? 0.5;
                 const R_se = 0.04;
                 gain = I_tot * surf.area * surf.uValue * R_se * alpha;
@@ -467,29 +549,28 @@ function calculateZoneHourly(
         });
 
 
-        // 3. Internal Gains (Phi_int)
-        // Derived from Profile Daily Totals provided in Wh/(m²·d)
+        // 3. 내부 발열 (Phi_int)
         let Phi_int = 0;
         let Q_dhw_val = 0;
+
+        // 조명 (DIN/TS 18599-4)
+        let lightingSystem = systems?.find(s => s.type === "LIGHTING" && s.linkedZoneIds?.includes(zone.id || ""));
+        if (!lightingSystem && zone.linkedLightingSystemId) {
+            lightingSystem = systems?.find(s => s.id === zone.linkedLightingSystemId);
+        }
+        if (!lightingSystem) {
+            lightingSystem = systems?.find(s => s.type === "LIGHTING" && s.isShared);
+        }
 
         if (isOccupied) {
             const usageHours = Math.max(1, profile.usageHoursEnd - profile.usageHoursStart);
 
-            // Metabolic
+            // 인체 발열
             const powerMetabolic = (profile.metabolicHeat * Area) / usageHours;
 
-            // Equipment
+            // 기기 발열
             const powerEquipment = (profile.equipmentHeat * Area) / usageHours;
 
-            // Lighting (Dynamic DIN/TS 18599-4)
-            // Find relevant Lighting system
-            let lightingSystem = systems?.find(s => s.type === "LIGHTING" && s.linkedZoneIds?.includes(zone.id || ""));
-            if (!lightingSystem && zone.linkedLightingSystemId) {
-                lightingSystem = systems?.find(s => s.id === zone.linkedLightingSystemId);
-            }
-            if (!lightingSystem) {
-                lightingSystem = systems?.find(s => s.type === "LIGHTING" && s.isShared);
-            }
 
             const lightingCalc = calculateLightingDemand(
                 zone,
@@ -499,50 +580,42 @@ function calculateZoneHourly(
                 profile,
                 lightingSystem as LightingSystem
             );
-            const powerLighting = lightingCalc.heatGainLighting; // Heat gain component
-            // Note: We also need to track lightingCalc.powerLighting as Energy, but Phi_int deals with heat.
+            const powerLighting = lightingCalc.heatGainLighting; // 조명에 의한 입열 성분
+            const powerLightingEnergy = lightingCalc.powerLighting; // 조명 에너지 소비량
 
-            // DHW (Dynamic DIN/TS 18599-8)
-            // Find relevant DHW system for this zone
-            // Priority: Linked to Zone -> Global Shared -> None
+            // 급탕 (DIN/TS 18599-8)
             let dhwSystem = systems?.find(s => s.type === "DHW" && s.linkedZoneIds?.includes(zone.id || ""));
             if (!dhwSystem) {
                 dhwSystem = systems?.find(s => s.type === "DHW" && s.isShared);
             }
 
-            // Ambient temperature for DHW losses. 
-            // If storage is in conditioned space, use Ti (Theta_m_prev is best guess for now or just 20C const).
-            // If unconditioned, use Te or 15C.
-            // Simplified: Use 20C if we assume indoor, Te if outdoor. 
+            // 급탕 손실 계산을 위한 주변 온도 설정
             let ambientForDHW = 20;
             if (dhwSystem?.type === "DHW" && dhwSystem.storage?.location === "unconditioned") {
                 ambientForDHW = Te;
             }
 
-            // Cast to DHWSystem to satisfy TS if check passed
             const dhwCalc = calculateHourlyDHW(zone, profile, localHour, isOccupied, dhwSystem as DHWSystem, ambientForDHW);
             const heatGainDHW = dhwCalc.heatGainDHW;
-            Q_dhw_val = dhwCalc.energyDHW; // Generator Output required (Thermal Demand + Losses)
+            Q_dhw_val = dhwCalc.energyDHW; // 열원기 출력 필요량 (열수요 + 손실)
 
             Phi_int = powerMetabolic + powerEquipment + powerLighting + heatGainDHW;
 
         } else {
-            // Unoccupied: Standby loads (e.g. 5% of equipment)
+            // 비재실 시: 대기 부하 (예: 기기의 5%)
             const usageHours = Math.max(1, profile.usageHoursEnd - profile.usageHoursStart);
             const powerEquipment = (profile.equipmentHeat * Area) / usageHours;
 
-            // DHW in unoccupied? 
             let dhwSystem = systems?.find(s => s.type === "DHW" && s.linkedZoneIds?.includes(zone.id || ""));
             if (!dhwSystem) {
                 dhwSystem = systems?.find(s => s.type === "DHW" && s.isShared);
             }
 
-            // Still calculate DHW losses (storage/circulation) even if not occupied
+            // 비재실 시에도 유실(저장/순환)은 발생함
             let ambientForDHW = 20;
             if (dhwSystem?.type === "DHW" && dhwSystem.storage?.location === "unconditioned") {
                 ambientForDHW = Te;
             }
-            // Passing isOccupied=false will zero out useful demand, but losses remain
             const dhwCalc = calculateHourlyDHW(zone, profile, localHour, false, dhwSystem as DHWSystem, ambientForDHW);
 
             Q_dhw_val = dhwCalc.energyDHW;
@@ -551,168 +624,74 @@ function calculateZoneHourly(
             Phi_int = (powerEquipment * 0.05) + heatGainDHW;
         }
 
-        // --- C. 5R1C Solution ---
-        // Inputs: H_tr_em, H_tr_w, H_tr_is, H_tr_ms, H_ve, Cm
-        //         Phi_sol, Phi_int, Te, Theta_sup(usually Te), Theta_m_prev
+        // --- C. 5R1C 해법 ---
+        // 입력: H_tr_em, H_tr_w, H_tr_is, H_tr_ms, H_ve, Cm
+        //       Phi_sol, Phi_int, Te, Theta_m_prev
 
-        // Split gains
-        // Solar -> Node S (mostly), some to M, some to I (air)
-        // ISO 52016 standard distribution:
-        // Windows -> All to Node S (simplification, strictly some to M)
-        // Opaque -> Node M? No, usually opaque solar is via sol-air temp on H_tr_em
-        // Here we put Sol/Int gains to:
-        // Phi_int -> Node I (40%), Node S (60%)?
-        // Phi_sol -> Node S (90%), Node I (10%)?
+        // 취득 열량 분리 (대류와 복사 성분)
+        // ISO 52016 표준에 따른 배분:
+        // Phi_int -> 노드 I (50%), 노드 S (50%)
+        // Phi_sol -> 노드 S (100% 근사)
 
-        const Phi_ia = 0.5 * Phi_int; // Convective internal
-        const Phi_st = (1 - 0.5) * Phi_int + Phi_sol; // Radiative internal + Solar (all to surface/mass)
+        const Phi_ia = 0.5 * Phi_int; // 내부 대류 취득
+        const Phi_st = (1 - 0.5) * Phi_int + Phi_sol; // 내부 복사 및 일사 취득 (표면/질량 노드로 전달)
 
-        const Phi_m = 0; // Direct to mass? (e.g. floor heating)
+        const Phi_m = 0; // 질량 노드로의 직접 취득 (바닥 난방 등)
 
-        // Matrix solution for Theta_m_t (Explicit Euler for time step 1h)
-        // (Cm / dt) * (Tm_t - Tm_t-1) = Net Heat Flow to Mass
-        // Net Flow = H_tr_ms * (T_s - T_m) + Phi_m
-        // But T_s depends on T_m, T_air...
-        // This requires standard ISO transformation to linear system.
-
-        // Simplified Crank-Nicolson / Analytic Step (ISO 13790 / 52016 simplified)
-        // Using calculation method of ISO 13790 7.2.2 (Monthly) adapted or 5R1C explicit.
-
-        // We need Theta_air (Ti) to calculate Loads.
-        // But Ti depends on Load (if controlled).
-
-        // Strategy: Calculate Free Running Temperature first.
-
-        // Determine Setpoints based on Occupancy
+        // 전략: 먼저 냉난방 기기가 없는 상태의 자연 온도(Free Running Temperature)를 계산
+        // 재실 여부에 따른 설정 온도 결정
         let Theta_set_h = zone.temperatureSetpoints.heating;
         let Theta_set_c = zone.temperatureSetpoints.cooling;
 
         if (!isOccupied) {
-            // Apply Setback / Shutdown
+            // 야간 설정(Setback) 또는 운전 정지 반영
             const setbackDelta = profile.heatingSetbackTemp ?? 4.0;
             const mode = zone.heatingReducedMode || "setback";
 
             if (mode === "shutdown") {
-                // Frost protection only
+                // 동파 방지 모드
                 Theta_set_h = 5.0;
             } else {
-                // Reduced operation
                 Theta_set_h = Theta_set_h - setbackDelta;
             }
 
-            // Cooling usually off during night/unoccupied? or setback?
-            // Simplified: Relax cooling setpoint significantly
-            Theta_set_c = 40.0; // Effectively off
+            // 비재실 시 냉방은 정지한 것으로 가정
+            Theta_set_c = 40.0;
         }
 
-        // --- Solver Steps (Simplified 5R1C) ---
-        // 1. Calculate equivalent inputs for T_m
-        // 2. Update T_m
-        // 3. Calculate T_s, T_air based on T_m
-
-        // Equiv Conductances
-        // Let's use strict node definitions:
-        // Nodes: I(air), S(surface), M(mass), E(exterior), Sup(supply)
-        // Connectors:
-        // E -> I : H_tr_w + H_ve
-        // E -> M : H_tr_em
-        // M -> S : H_tr_ms
-        // S -> I : H_tr_is
-
-        // Correction: H_tr_em in ISO connects E and M directly? Or via S?
-        // In 5R1C (ISO 13790/52016):
-        // H_tr_em connects Exterior to Surface(S) or Mass(M)?
-        // Usually: E --(H_em)-- M --(H_ms)-- S --(H_is)-- I
-        // And Windows: E --(H_w)-- I
-        // And Vent: E --(H_ve)-- I
-
-        // Let's implement the specific ISO 13790 Simple Hourly Method (Annex C) logic
-        // It provides exact formulas.
-
-        // C.2 Inputs
-        const H_tr_em_calc = H_tr_op; // Opaque Transmission
-        const H_tr_3 = H_tr_w + H_ve; // Direct E->I
-        const H_tr_ms_calc = 9.1 * Am;
-        const H_tr_is_calc = h_ic * Atot;
-
-        const Phi_mtot = Phi_m + H_tr_em_calc * Te + H_tr_ms_calc * (Phi_st + H_tr_ms_calc * theta_m_prev / H_tr_ms_calc) / (H_tr_ms_calc + H_tr_is_calc);
-        // Logic gets messy.
-        // Let's use a discretized numerical update:
-        // T_m_new = T_m_prev + (dt / Cm) * ( Sum(Exchanges) + Sources )
-
-        // Current Step guess:
-        // Nodes: Ti, Ts, Tm.  
-        // Eq 1: Cm * (Tm - Tm_prev) = H_tr_em(Te - Tm) + H_tr_ms(Ts - Tm) + Phi_m
-        // Eq 2: 0 = H_tr_ms(Tm - Ts) + H_tr_is(Ti - Ts) + Phi_st + H_sol_window_absorption?
-        // Eq 3: 0 = H_tr_is(Ts - Ti) + H_tr_w(Te - Ti) + H_ve(Te - Ti) + Phi_ia + Phi_HC
-
-        // This is a linear system 3x3 (or 2x2 algebraic + 1 ODE).
-        // Eliminate Ts from Eq 2:
-        // Ts * (H_ms + H_is) = H_ms*Tm + H_is*Ti + Phi_st
-        // Ts = (H_ms*Tm + H_is*Ti + Phi_st) / (H_ms + H_is)
-
-        // Substitute Ts into Eq 3 (Air Node Balance):
-        // H_is * (Ts - Ti) + (H_w + H_ve)(Te - Ti) + Phi_ia + Phi_HC = 0
-        // H_is * [ (H_ms*Tm + H_is*Ti + Phi_st)/(H_ms+H_is) - Ti ] + ... = 0
-        // ... solve for Ti (Air Temp) as function of Phi_HC
-
-        // Let G1 = H_tr_w + H_ve
-        // Let G2 = H_tr_is * H_tr_ms / (H_tr_is + H_tr_ms)
-        // Ti (Free Running, Phi_HC=0):
-        // Balance at I:
-        // H_is(Ts - Ti) + G1(Te - Ti) + Phi_ia = 0
-        // Substitute Ts...
-        // Simplified Result for Ti_free:
-        // Ti_free = ( G1*Te + Phi_ia + G2*Tm + (H_is/(H_is+H_ms))*Phi_st ) / ( G1 + G2 )
-
+        // --- 솔버 단계 (Simplified 5R1C) ---
+        // G1: 외기-공기 노드 간의 직접 연결 (창호 및 환기)
         const G1 = H_tr_w + H_ve;
-        const G2 = (H_tr_is_calc * H_tr_ms_calc) / (H_tr_is_calc + H_tr_ms_calc);
-        const factor_st = H_tr_is_calc / (H_tr_is_calc + H_tr_ms_calc);
 
+        // 자연 실내 온도 계산 (Heating/Cooling = 0일 때)
         let Ti_free = (G1 * Te + Phi_ia + G2 * theta_m_prev + factor_st * Phi_st) / (G1 + G2);
 
-        // Check Setpoints
         let Q_HC = 0;
         let Ti = Ti_free;
 
-        // Heating
+        // 난방 필요 확인
         if (Ti_free < Theta_set_h) {
-            // Need Heating
-            // Calculate Q required to reach Theta_set_h
-            // Re-solve eq for Q with Ti = Setpoint
-            // Q_h = (G1+G2)*Titan - (Numerator)
             Q_HC = (G1 + G2) * Theta_set_h - (G1 * Te + Phi_ia + G2 * theta_m_prev + factor_st * Phi_st);
             Ti = Theta_set_h;
         }
-        // Cooling
+        // 냉방 필요 확인
         else if (Ti_free > Theta_set_c) {
-            // Need Cooling
             Q_HC = (G1 + G2) * Theta_set_c - (G1 * Te + Phi_ia + G2 * theta_m_prev + factor_st * Phi_st);
             Ti = Theta_set_c;
         }
 
-        // Limit capacity? (Infinite for now)
-
-        // Update Mass Temp (Explicit Euler)
-        // Eq 1: Cm * (Tm_new - Tm_prev)/1 = H_tr_em(Te - Tm_prev) + H_tr_ms(Ts - Tm_prev)
-        // Need Ts with Actual Ti (with heating/cooling applied)
-        const Ts = (H_tr_ms_calc * theta_m_prev + H_tr_is_calc * Ti + Phi_st) / (H_tr_is_calc + H_tr_ms_calc);
-
-        const flux_m = H_tr_em_calc * (Te - theta_m_prev) + H_tr_ms_calc * (Ts - theta_m_prev);
+        // 질량 온도 업데이트 (Explicit Euler Method)
+        const Ts = (H_tr_ms * theta_m_prev + H_tr_is * Ti + Phi_st) / (H_tr_is + H_tr_ms);
+        const flux_m = H_tr_em * (Te - theta_m_prev) + H_tr_ms * (Ts - theta_m_prev);
         const theta_m_next = theta_m_prev + flux_m / Cm;
 
         const Q_heat = Q_HC > 0 ? Q_HC : 0;
         const Q_cool = Q_HC < 0 ? -Q_HC : 0;
 
-        // Recalculate Lighting Energy for Result (or optimized: do it once above)
-        // Since we are inside the loop, we can just call it again or assume we saved it.
-        // Let's use the same logic as above to get the value.
-        // Optimization: Let's assume we need to access 'powerLighting' calculated above.
-        // But scope prevents it without refactor.
-        // Quick fix: Re-eval.
+        // 조명 에너지 소비량 재산출
         let Q_light = 0;
         if (isOccupied) {
-            const lCalc = calculateLightingDemand(zone, hrData.I_beam, hrData.I_diff, hrData.sunAltitude, profile);
+            const lCalc = calculateLightingDemand(zone, hrData.I_beam, hrData.I_diff, hrData.sunAltitude, profile, lightingSystem as LightingSystem);
             Q_light = lCalc.powerLighting;
         }
 
@@ -736,16 +715,16 @@ function calculateZoneHourly(
         sum_Qw += Q_dhw_val;
         sum_Qaux += fanPowerWatts;
 
-        // Aggregate Monthly
-        const mIdx = hrData.month - 1; // 0-11
+        // 월간 집계 데이터 업데이트
+        const mIdx = hrData.month - 1;
         const mA = monthlyAggs[mIdx];
         mA.Qh += Q_heat / 1000; // Wh -> kWh
         mA.Qc += Q_cool / 1000;
         mA.Q_lighting += Q_light / 1000;
         mA.Q_dhw += Q_dhw_val / 1000;
         mA.Q_aux += fanPowerWatts / 1000;
-        // Detailed gains for chart (Split naive)
-        // Just for viz, accumulate hourly components
+
+        // 손실 및 취득 성분 분해 (차트 표시용)
         const QT = (H_tr_op + H_tr_w) * (Ti - Te);
         const QV = H_ve * (Ti - Te);
         const Qloss = QT + QV;
@@ -762,56 +741,55 @@ function calculateZoneHourly(
         mA.tempSum += Ti;
         mA.count++;
 
-        // Propagate state
+        // 상태값 갱신
         theta_m_prev = theta_m_next;
     }
 
-    // Finalize Monthlies
+    // 월간 결과 마무리
     const monthlyResults: MonthlyResult[] = monthlyAggs.map((m, i) => ({
         month: i + 1,
         QT: m.QT, QV: m.QV, Qloss: m.Qloss,
         QS: m.QS, QI: m.QI, Qgain: m.Qgain,
-        gamma: 0, eta: m.Qgain > 0 ? (m.Qloss - (m.Qh * 1000)) / m.Qgain : 1, // approx
+        gamma: 0, eta: m.Qgain > 0 ? (m.Qloss - (m.Qh * 1000)) / m.Qgain : 1,
         Qh: m.Qh, Qc: m.Qc,
         Q_heating: m.Qh,
         Q_cooling: m.Qc,
         Q_lighting: m.Q_lighting,
         Q_dhw: m.Q_dhw,
         Q_aux: m.Q_aux,
-        // PV Placeholder
         pvGeneration: 0,
-
-        avg_Ti: m.count > 0 ? m.tempSum / m.count : 0
+        avg_Ti: m.count > 0 ? m.tempSum / m.count : 0,
+        balanceDetails: {
+            Cm: Cm
+        }
     }));
 
-    // --- D. HVAC System Performance ---
-    // Calculate Final Energy & Primary Energy based on Net Demand (Qh, Qc)
-    // Find systems
-    // Find systems
+    // --- D. 설비 시스템 성능 계산 ---
+    // 요구 부하(Qh, Qc)를 바탕으로 최종 에너지 및 1차 에너지 계산
     let heatingSystem = systems?.find(s => s.type === "HEATING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as HeatingSystem | undefined;
     let coolingSystem = systems?.find(s => s.type === "COOLING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as CoolingSystem | undefined;
     const dhwSystemForFinal = systems?.find(s => s.type === "DHW" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as DHWSystem | undefined;
 
-    // Check for AHU Systems acting as Heating/Cooling
+    // 공조기(AHU)가 난방/냉방을 담당하는 경우 확인
     const ahuSystem = systems?.find(s => s.type === "AHU" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as AHUSystem | undefined;
 
     if (ahuSystem) {
-        // Map AHU Heating Coil to HeatingSystem
+        // AHU 가열 코일을 난방 시스템으로 매핑
         if (ahuSystem.heatingCoil && !heatingSystem) {
             heatingSystem = {
                 type: "HEATING",
                 id: ahuSystem.id,
-                projectId: ahuSystem.projectId, // Using existing proj ID
-                name: `${ahuSystem.name} (Heating)`,
+                projectId: ahuSystem.projectId,
+                name: `${ahuSystem.name} (가열)`,
                 isShared: ahuSystem.isShared,
                 generator: {
                     type: ahuSystem.heatingCoil.generatorType as any,
-                    fuel: ahuSystem.heatingCoil.fuel as any,
+                    energyCarrier: ahuSystem.heatingCoil.energyCarrier as any,
                     efficiency: ahuSystem.heatingCoil.efficiency
                 },
                 distribution: {
-                    temperatureRegime: "55/45", // Assumed for air heating
-                    pumpControl: "uncontrolled" // Dummy
+                    temperatureRegime: "55/45", // 공기 가열용 가정
+                    pumpControl: "uncontrolled"
                 },
                 emission: {
                     type: "air_heating"
@@ -819,17 +797,17 @@ function calculateZoneHourly(
             };
         }
 
-        // Map AHU Cooling Coil to CoolingSystem
+        // AHU 냉각 코일을 냉방 시스템으로 매핑
         if (ahuSystem.coolingCoil && !coolingSystem) {
             coolingSystem = {
                 type: "COOLING",
                 id: ahuSystem.id,
                 projectId: ahuSystem.projectId,
-                name: `${ahuSystem.name} (Cooling)`,
+                name: `${ahuSystem.name} (냉각)`,
                 isShared: ahuSystem.isShared,
                 generator: {
                     type: ahuSystem.coolingCoil.generatorType as any,
-                    fuel: ahuSystem.coolingCoil.fuel as any,
+                    energyCarrier: ahuSystem.coolingCoil.energyCarrier as any,
                     efficiency: ahuSystem.coolingCoil.efficiency
                 },
                 distribution: {
@@ -848,40 +826,34 @@ function calculateZoneHourly(
         coolingSystem as any
     );
 
-    // DHW Final Energy
-    // Q_dhw_final = Q_dhw_out / GeneratorEfficiency
+    // 급탕 최종 에너지 계산
+    // Q_dhw_final = Q_dhw_out / 발전 효율
     let dhwFinal = 0;
     let dhwPrimary = 0;
     let dhwCO2 = 0;
 
-    // Q_dhw_out is 'sum_Qw'. 
-    // Generator efficiency is only used here to convert to Final Energy.
-    // Losses (storage, dist) already added to sum_Qw in calculateHourlyDHW.
-    const dhwEff = dhwSystemForFinal?.generator.efficiency || 0.9; // Default 0.9
+    const dhwEff = dhwSystemForFinal?.generator.efficiency || 0.9;
     dhwFinal = (sum_Qw / 1000) / dhwEff;
 
-    // PEF & CO2
-    const dhwFuel = (dhwSystemForFinal?.generator.fuel as EnergySource) || 'natural_gas';
+    // 1차 에너지(PEF) 및 이산화탄소 배출 계수 적용
+    const dhwFuel = (dhwSystemForFinal?.generator.energyCarrier as EnergyCarrier) || 'natural_gas';
     const pef_dhw = PEF_FACTORS[dhwFuel];
     const co2f_dhw = CO2_FACTORS[dhwFuel];
 
     dhwPrimary = dhwFinal * pef_dhw;
     dhwCO2 = dhwFinal * co2f_dhw;
 
-    // Aux Energy Final/Primary
-    // Assuming Electricity
-    // sum_Qaux contains Fan Energy (Wh). Convert to kWh.
-    // Add Hydraulic Pump Energy from HVAC Result (kWh).
+    // 부속 기기(팬, 펌프 등) 에너지 계산
     const fanFinal = sum_Qaux / 1000; // kWh
     const pumpFinal = (hvac.auxiliaryEnergyHeating || 0) + (hvac.auxiliaryEnergyCooling || 0);
 
-    const auxFinal = fanFinal + pumpFinal; // Total Aux
+    const auxFinal = fanFinal + pumpFinal; // 총 부속 에너지
     const auxPrimary = auxFinal * PEF_FACTORS.electricity;
     const auxCO2 = auxFinal * CO2_FACTORS.electricity;
 
 
     return {
-        zoneId: zone.id || "unknown", // Fallback for types
+        zoneId: zone.id || "unknown",
         zoneName: zone.name,
         hourly: hourlyResults,
         monthly: monthlyResults,
@@ -895,28 +867,28 @@ function calculateZoneHourly(
             specificHeatingDemand: (sum_Qh / 1000) / Area,
             specificCoolingDemand: (sum_Qc / 1000) / Area,
 
-            // PV
+            // 태양광
             pvGeneration: 0,
             selfConsumption: 0,
             pvExport: 0,
 
-            // New HVAC Results
+            // 최종 에너지 및 1차 에너지 결과
             finalEnergy: {
                 heating: hvac.finalEnergyHeating,
                 cooling: hvac.finalEnergyCooling,
                 dhw: dhwFinal,
-                lighting: sum_Ql / 1000, // Elec is 1:1 final usually
+                lighting: sum_Ql / 1000,
                 auxiliary: auxFinal
             },
             primaryEnergy: {
                 heating: hvac.primaryEnergyHeating,
                 cooling: hvac.primaryEnergyCooling,
                 dhw: dhwPrimary,
-                lighting: (sum_Ql / 1000) * 2.75, // Elec PEF
+                lighting: (sum_Ql / 1000) * PEF_FACTORS.electricity,
                 auxiliary: auxPrimary,
-                total: hvac.primaryEnergyHeating + hvac.primaryEnergyCooling + dhwPrimary + ((sum_Ql / 1000) * 2.75) + auxPrimary
+                total: hvac.primaryEnergyHeating + hvac.primaryEnergyCooling + dhwPrimary + ((sum_Ql / 1000) * PEF_FACTORS.electricity) + auxPrimary
             },
-            co2Emissions: hvac.co2Heating + hvac.co2Cooling + dhwCO2 + ((sum_Ql / 1000) * 0.466) + auxCO2
+            co2Emissions: hvac.co2Heating + hvac.co2Cooling + dhwCO2 + ((sum_Ql / 1000) * CO2_FACTORS.electricity) + auxCO2
         }
     };
 }

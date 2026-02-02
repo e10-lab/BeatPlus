@@ -8,7 +8,7 @@ const zoneWithWindows: ZoneInput = {
     id: 'zone-win',
     projectId: 'proj-1',
     name: 'Office with Window',
-    usageType: '1_single_office',
+    usageType: '1_office',
     area: 100,
     height: 3,
     volume: 300,
@@ -16,11 +16,24 @@ const zoneWithWindows: ZoneInput = {
     surfaces: [
         {
             id: 's1', zoneId: 'zone-win', name: 'Win', type: 'window',
-            area: 20, uValue: 1.5, orientation: 'S', tilt: 90, shgc: 0.6
+            area: 20, uValue: 1.5, orientation: 'S', tilt: 90, shgc: 0.6,
+            shading: { hasDevice: false, fcValue: 1.0, type: 'external' }
         } as Surface
     ],
     isExcluded: false,
     lighting: { efficacy: 50, powerDensity: 10 } // 10 W/m2
+};
+
+const lightingSystem = {
+    id: 'light-1',
+    projectId: 'proj-1',
+    name: 'Daylight Control System',
+    type: 'LIGHTING',
+    isShared: true,
+    lightingEfficacy: 50,
+    controlType: 'daylight',
+    hasConstantIlluminanceControl: false,
+    linkedZoneIds: ['zone-win', 'zone-no-win']
 };
 
 // Test Case 2: Zone without Windows (No Daylight Saving)
@@ -33,8 +46,8 @@ const zoneNoWindows: ZoneInput = {
 
 console.log("--- Running Day/Night Lighting Verification ---");
 
-const resultWin = calculateEnergyDemand([zoneWithWindows]);
-const resultNoWin = calculateEnergyDemand([zoneNoWindows]);
+const resultWin = calculateEnergyDemand([zoneWithWindows], undefined, undefined, undefined, undefined, undefined, [lightingSystem as any]);
+const resultNoWin = calculateEnergyDemand([zoneNoWindows], undefined, undefined, undefined, undefined, undefined, [lightingSystem as any]);
 
 // Check Internal Gains (QI) for a month
 // QI = Q_lighting + Q_people + Q_equip
