@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    Plus, Pencil, Trash2, Layers, Sun, Wind, Mountain
+    Plus, Pencil, Trash2, Layers, Sun, Wind, Mountain, ArrowLeft
 } from "lucide-react";
+
+
 import { Construction } from "@/types/project";
 import { ConstructionForm } from "./construction-form";
 import { SurfaceIcon } from "@/components/ui/icons/surface-icon";
@@ -167,13 +169,18 @@ function SortableConstructionCard({ c, onEdit, onDelete }: SortableConstructionC
 export function ConstructionManager({ constructions, projectId, onUpdate }: ConstructionManagerProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [items, setItems] = useState<Construction[]>(constructions);
+    const [items, setItems] = useState<Construction[]>(() => {
+        // Explicitly deduplicate by ID on initialization
+        return Array.from(new Map(constructions.map(item => [item.id, item])).values());
+    });
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
 
     // Sync items when props change (e.g. initial load or refetch)
     useEffect(() => {
-        setItems(constructions);
+        // Explicitly deduplicate by ID to prevent "duplicate key" errors
+        const uniqueItems = Array.from(new Map(constructions.map(item => [item.id, item])).values());
+        setItems(uniqueItems);
     }, [constructions]);
 
     // DnD Sensors
@@ -215,17 +222,25 @@ export function ConstructionManager({ constructions, projectId, onUpdate }: Cons
         try {
             if (editingId) {
                 await updateConstruction(projectId, editingId, construction);
+                // Optimistic Local Update
+                setItems(prev => prev.map(item => item.id === editingId ? { ...construction, id: editingId } : item));
             } else {
                 // Determine order index for new item? Service handles default append or we can.
                 // For now, let service add it, refetch will show it at bottom.
-                await createConstruction(projectId, construction);
+                const newId = await createConstruction(projectId, construction);
+                // Optimistic Local Update (Add new item)
+                const newConstruction = { ...construction, id: newId };
+                setItems(prev => [...prev, newConstruction]);
             }
             setIsEditing(false);
             setEditingId(null);
-            onUpdate(); // Trigger refresh in parent
+            // Delay onUpdate to give Firestore time to commit the write
+            // before re-fetching, preventing stale data from overwriting the optimistic update
+            setTimeout(() => onUpdate(), 500);
         } catch (error) {
             console.error("Failed to save construction:", error);
             alert("저장 중 오류가 발생했습니다.");
+            onUpdate();
         }
     };
 
@@ -254,6 +269,9 @@ export function ConstructionManager({ constructions, projectId, onUpdate }: Cons
         const initialData = editingId ? items.find(c => c.id === editingId) : undefined;
         return (
             <div className="max-w-5xl mx-auto">
+                <Button variant="ghost" size="sm" onClick={() => { setIsEditing(false); setEditingId(null); }} className="mb-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> 외피 목록으로 돌아가기 (Back to List)
+                </Button>
                 <ConstructionForm
                     projectId={projectId}
                     initialData={initialData}

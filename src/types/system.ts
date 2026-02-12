@@ -68,6 +68,8 @@ export interface HeatingSystem extends SystemBase {
     emission: {
         type: "radiator" | "floor_heating" | "fan_coil" | "air_heating";
         fanPower?: number; // Watts (Total for connected zones)
+        convectiveFraction?: number; // 0.0 - 1.0 (Default depends on type, e.g. floor=0.3, fan_coil=0.9)
+        maxCapacity?: number; // kW (Limit for this system's output in hourly calc)
     };
 }
 
@@ -87,6 +89,8 @@ export interface CoolingSystem extends SystemBase {
     emission: {
         type: "surface" | "fan_coil" | "air";
         fanPower?: number; // Watts (Total for connected zones)
+        convectiveFraction?: number; // 0.0 - 1.0
+        maxCapacity?: number; // kW
     };
 }
 

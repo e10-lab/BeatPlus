@@ -1,5 +1,4 @@
 
-
 export interface UsageProfile {
     id: string; // DIN 18599-10 프로필 ID 또는 식별 키
     name: string; // 한국어 명칭 (원본 DIN 번호 포함)
@@ -32,7 +31,6 @@ export interface UsageProfile {
     // 4. 실내 환경
     minOutdoorAir: number; // m³/(h·m²) (외기 도입량)
     humidityRequirement: string; // 예: "None", "40-60%"
-    minOutdoorAirFlow: number; // m³/(h·m²) (최소 외기 도입량 - 위와 중복될 수 있으나 구분됨)
 
     // 5. 공조 시스템 계수
     hvacAbsenceFactor: number; // F_A,RLT (공조 부재율)
@@ -42,10 +40,18 @@ export interface UsageProfile {
     metabolicHeat: number; // Wh/(m²·d) (인체 발열)
     equipmentHeat: number; // Wh/(m²·d) (기기 발열)
     dhwDemand: number; // Wh/(m²·d) (급탕 부하) - DIN 18599-10 Table 4 & 5
+
+    // 7. 기타 계수 (Table 8 etc)
+    reductionFactorPollution?: number; // F_V (오염으로 인한 감소 계수)
+    pollutionFactor?: number; // k_2 (오염 계수)
+
+    // 8. 건물 자동화 (Building Automation) - Table 9 (Non-Res) / Table 5 (Res)
+    deltaThetaEMS?: { d: number; c: number; b: number; a: number }; // Δθ_EMS [K]
+    fAdapt?: { d: number; c: number; b: number; a: number }; // f_adapt
 }
 
 export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
-    // 1. Office
+    // 1. Office (Single/Group)
     "1_office": {
         id: "1_office", name: "01 사무실 (개인/그룹)",
         version: "2025",
@@ -60,13 +66,41 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 4.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 4.0,
         hvacAbsenceFactor: 0.3, hvacPartialOperationFactor: 0.7,
-        metabolicHeat: 32.0, equipmentHeat: 45.0, dhwDemand: 10.0
+        metabolicHeat: 30.0, equipmentHeat: 39.0, dhwDemand: 10.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.0, a: -1.5 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 2. Open Plan Office (was 3)
-    "2_open_plan": {
-        id: "2_open_plan", name: "02 사무실 (대형/개방형)",
+    // 2. Office (Open Plan) - was 2_open_plan (from DIN ~3 but normalized to 2 here? User wants 1-43)
+    // Actually standard 2 is Group Office, 3 is Open Plan.
+    // Let's assume the user's "1-43" implies strictly following the DIN list. 
+    // DIN 18599-10 Table 4:
+    // 1: Single office
+    // 2: Group office (often merged with 1 in simplified tools, but let's see current data)
+    // Current data had "2_open_plan" as "02".
+    // 2. Group Office (Gruppenbüro) - Table A.2
+    "2_group_office": {
+        id: "2_group_office", name: "02 사무실 (그룹)",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2543.0, usageHoursNight: 207.0,
+        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 500.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.84, lightingAbsenceFactor: 0.3,
+        partialOperationFactorLighting: 0.7,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 4.0,
+        hvacAbsenceFactor: 0.3, hvacPartialOperationFactor: 0.7,
+        metabolicHeat: 30.0, equipmentHeat: 70.0, dhwDemand: 10.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.0, a: -1.5 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
+    },
+    // 3. Open Plan Office (Großraumbüro) - Table A.3
+    "3_open_plan": {
+        id: "3_open_plan", name: "03 사무실 (대형/개방형)",
         version: "2025",
         usageHoursStart: 7, usageHoursEnd: 18,
         dailyUsageHours: 11.0, annualUsageDays: 250.0,
@@ -79,13 +113,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 6.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 6.0,
         hvacAbsenceFactor: 0.2, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 45.0, equipmentHeat: 65.0, dhwDemand: 10.0
+        metabolicHeat: 45.0, equipmentHeat: 70.0, dhwDemand: 10.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.0, a: -1.5 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 3. Meeting (was 4)
-    "3_meeting": {
-        id: "3_meeting", name: "03 회의실",
+    // 4. Meeting (Besprechung) - Table A.4
+    "4_meeting": {
+        id: "4_meeting", name: "04 회의실",
         version: "2025",
         usageHoursStart: 7, usageHoursEnd: 18,
         dailyUsageHours: 11.0, annualUsageDays: 250.0,
@@ -98,13 +133,34 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 15.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 15.0,
         hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.5,
-        metabolicHeat: 100.0, equipmentHeat: 10.0, dhwDemand: 5.0
+        metabolicHeat: 95.0, equipmentHeat: 0.0, dhwDemand: 5.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.2, a: -2.0 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 4. Library (was 29)
-    "4_library": {
-        id: "4_library", name: "04 도서관/열람실",
+    // 5. Counter Hall (Schalterhalle) - Table A.5
+    "5_counter_hall": {
+        id: "5_counter_hall", name: "05 민원실/창구 (Schalterhalle)",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2543.0, usageHoursNight: 207.0,
+        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 200.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.87, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 2.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
+        metabolicHeat: 15.0, equipmentHeat: 25.0, dhwDemand: 700.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.0, a: -1.5 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
+    },
+    // 29. Library (moved from 4 to make room)
+    "29_library": {
+        id: "29_library", name: "29 도서관/열람실",
         version: "2025",
         usageHoursStart: 8, usageHoursEnd: 20,
         dailyUsageHours: 12.0, annualUsageDays: 300.0,
@@ -117,13 +173,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 8.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 8.0,
         hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 175.0, equipmentHeat: 10.0, dhwDemand: 5.0
+        metabolicHeat: 104.5, equipmentHeat: 0.0, dhwDemand: 5.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 5. Retail (was 6)
-    "5_retail": {
-        id: "5_retail", name: "05 소매점/백화점",
+    // 6. Retail/Department Store (Einzelhandel/Kaufhaus) - Table A.6
+    "6_retail_department": {
+        id: "6_retail_department", name: "06 백화점/대형점포",
         version: "2025",
         usageHoursStart: 8, usageHoursEnd: 20,
         dailyUsageHours: 12.0, annualUsageDays: 300.0,
@@ -136,13 +193,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 4.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 4.0,
         hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 88.0, equipmentHeat: 25.0, dhwDemand: 5.0
+        metabolicHeat: 80.0, equipmentHeat: 250.0, dhwDemand: 750.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.5, a: -2.0 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 6. Retail Large (was 7)
-    "6_retail_large": {
-        id: "6_retail_large", name: "06 대형 점포/쇼핑센터",
+    // 7. Retail w/ Cooling (Lebensmittel m. Kühlprodukten) - Table A.7
+    "7_retail_cooling": {
+        id: "7_retail_cooling", name: "07 식품매장 (냉장포함)",
         version: "2025",
         usageHoursStart: 8, usageHoursEnd: 20,
         dailyUsageHours: 12.0, annualUsageDays: 300.0,
@@ -155,13 +213,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 4.0, minOutdoorAirFlow: 2.5,
-        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 88.0, equipmentHeat: 25.0, dhwDemand: 5.0
+        minOutdoorAir: 3.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.5,
+        metabolicHeat: 80.0, equipmentHeat: 40.0, dhwDemand: 250.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.5, a: -2.0 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 7. Classroom (was 8)
-    "7_classroom": {
-        id: "7_classroom", name: "07 교실 (학교)",
+    // 8. Classroom (Klassenzimmer) - Table A.8
+    "8_classroom": {
+        id: "8_classroom", name: "08 교실 (학교/유치원)",
         version: "2025",
         usageHoursStart: 8, usageHoursEnd: 15,
         dailyUsageHours: 7.0, annualUsageDays: 200.0,
@@ -174,13 +233,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 10.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 10.0,
         hvacAbsenceFactor: 0.25, hvacPartialOperationFactor: 0.9,
-        metabolicHeat: 105.0, equipmentHeat: 22.0, dhwDemand: 15.0
+        metabolicHeat: 100.0, equipmentHeat: 27.5, dhwDemand: 15.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.0, a: -1.5 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 8. Lecture Hall (was 9)
-    "8_lecture_hall": {
-        id: "8_lecture_hall", name: "08 강의실 (강당)",
+    // 9. Lecture Hall (Hörsaal/Auditorium) - Table A.9
+    "9_lecture_hall": {
+        id: "9_lecture_hall", name: "09 강의실/강당 (Hörsaal)",
         version: "2025",
         usageHoursStart: 8, usageHoursEnd: 18,
         dailyUsageHours: 10.0, annualUsageDays: 150.0,
@@ -193,13 +253,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 30.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 30.0,
         hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.6,
-        metabolicHeat: 440.0, equipmentHeat: 25.0, dhwDemand: 5.0
+        metabolicHeat: 420.0, equipmentHeat: 1.0, dhwDemand: 5.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.2, a: -2.0 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 9. Bed Room (was 10)
-    "9_bed_room": {
-        id: "9_bed_room", name: "09 병실 (병원)",
+    // 10. Bed Room (Bettenzimmer) - Table A.10
+    "10_bed_room": {
+        id: "10_bed_room", name: "10 병실 (병원/요양)",
         version: "2025",
         usageHoursStart: 0, usageHoursEnd: 24,
         dailyUsageHours: 24.0, annualUsageDays: 365.0,
@@ -212,13 +273,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 0.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 5.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 5.0,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.8,
-        metabolicHeat: 112.0, equipmentHeat: 25.0, dhwDemand: 120.0
+        metabolicHeat: 120.0, equipmentHeat: 24.0, dhwDemand: 120.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 10. Hotel Room (was 11)
-    "10_hotel_room": {
-        id: "10_hotel_room", name: "10 호텔 객실",
+    // 11. Hotel Room (Hotelzimmer) - Table A.11
+    "11_hotel_room": {
+        id: "11_hotel_room", name: "11 호텔 객실",
         version: "2025",
         usageHoursStart: 21, usageHoursEnd: 8,
         dailyUsageHours: 11.0, annualUsageDays: 365.0,
@@ -231,13 +293,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 3.0, minOutdoorAirFlow: 2.0,
+        minOutdoorAir: 3.0,
         hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.5,
-        metabolicHeat: 75.0, equipmentHeat: 45.0, dhwDemand: 120.0
+        metabolicHeat: 70.0, equipmentHeat: 44.0, dhwDemand: 120.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 11. Canteen (was 12)
-    "11_canteen": {
-        id: "11_canteen", name: "11 구내식당",
+    // 12. Canteen (Kantine) - Table A.12
+    "12_canteen": {
+        id: "12_canteen", name: "12 구내식당",
         version: "2025",
         usageHoursStart: 8, usageHoursEnd: 15,
         dailyUsageHours: 7.0, annualUsageDays: 250.0,
@@ -250,13 +313,14 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 18.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 18.0,
         hvacAbsenceFactor: 0.7, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 185.0, equipmentHeat: 12.0, dhwDemand: 80.0
+        metabolicHeat: 175.0, equipmentHeat: 10.0, dhwDemand: 5.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 12. Restaurant (was 13)
-    "12_restaurant": {
-        id: "12_restaurant", name: "12 레스토랑",
+    // 13. Restaurant (Restaurant) - Table A.13
+    "13_restaurant": {
+        id: "13_restaurant", name: "13 레스토랑",
         version: "2025",
         usageHoursStart: 10, usageHoursEnd: 24,
         dailyUsageHours: 14.0, annualUsageDays: 300.0,
@@ -269,13 +333,13 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 18.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 18.0,
         hvacAbsenceFactor: 0.6, hvacPartialOperationFactor: 0.7,
-        metabolicHeat: 250.0, equipmentHeat: 15.0, dhwDemand: 100.0
+        metabolicHeat: 233.0, equipmentHeat: 14.0, dhwDemand: 100.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
     },
-    // 13. Kitchen (was 14)
-    "13_kitchen": {
-        id: "13_kitchen", name: "13 주방 (준비/조리)",
+    // 14. Kitchen (Küche) - Table A.14 (Replaced 13_kitchen)
+    "14_kitchen": {
+        id: "14_kitchen", name: "14 주방 (비주거)",
         version: "2025",
         usageHoursStart: 10, usageHoursEnd: 23,
         dailyUsageHours: 13.0, annualUsageDays: 300.0,
@@ -288,87 +352,74 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 90.0, minOutdoorAirFlow: 0.0,
+        minOutdoorAir: 90.0,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 60.0, equipmentHeat: 1900.0, dhwDemand: 500.0
+        metabolicHeat: 56.0, equipmentHeat: 1800.0, dhwDemand: 500.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.5, a: -2.0 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 14. Heated Storage / Archive
-    "14_storage_heated": {
-        id: "14_storage_heated", name: "14 창고/아카이브 (난방)",
+
+    // 15. Kitchen Prep/Storage (Küche - Vorbereitung/Lager) - Table A.15
+    "15_kitchen_prep": {
+        id: "15_kitchen_prep", name: "15 주방 (준비/저장)",
+        version: "2025",
+        usageHoursStart: 10, usageHoursEnd: 23,
+        dailyUsageHours: 13.0, annualUsageDays: 300.0,
+        usageHoursDay: 2411.0, usageHoursNight: 1489.0,
+        hvacDailyOperationHours: 15.0, hvacAnnualOperationDays: 300.0,
+        illuminance: 300.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.5,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 15.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 56.0, equipmentHeat: 304.0, dhwDemand: 50.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
+    },
+    // 16. WC/Sanitary (WC und Sanitärräume) - Table A.16
+    "16_wc_sanitary": {
+        id: "16_wc_sanitary", name: "16 화장실/위생공간",
         version: "2025",
         usageHoursStart: 7, usageHoursEnd: 18,
         dailyUsageHours: 11.0, annualUsageDays: 250.0,
-        usageHoursDay: 2543.0, usageHoursNight: 207.0,
-        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
-        illuminance: 100.0, workplaneHeight: 0.8,
+        usageHoursDay: 2750.0, usageHoursNight: 0.0,
+        hvacDailyOperationHours: 11.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 200.0, workplaneHeight: 0.8,
         illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.9,
         partialOperationFactorLighting: 1.0,
         heatingSetpoint: 21.0, coolingSetpoint: 24.0,
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 0.15, minOutdoorAirFlow: 0.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0
+        humidityRequirement: "Keine",
+        minOutdoorAir: 15.0,
+        hvacAbsenceFactor: 0.7, hvacPartialOperationFactor: 1.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 20.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.5, a: -2.0 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 15. Unheated Storage (was 20)
-    "15_storage_unheated": {
-        id: "15_storage_unheated", name: "15 창고/물류 (비난방)",
+
+    // 17. Other Common Rooms (Sonstige Aufenthaltsräume) - Table A.17
+    "17_other_common": {
+        id: "17_other_common", name: "17 기타 휴게/대기 (Pausenraum)",
         version: "2025",
         usageHoursStart: 7, usageHoursEnd: 18,
         dailyUsageHours: 11.0, annualUsageDays: 250.0,
         usageHoursDay: 2543.0, usageHoursNight: 207.0,
         hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
-        illuminance: 100.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.98,
+        illuminance: 300.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.93, lightingAbsenceFactor: 0.5,
         partialOperationFactorLighting: 1.0,
         heatingSetpoint: 21.0, coolingSetpoint: 24.0,
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 0.15, minOutdoorAirFlow: 0.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0
+        minOutdoorAir: 7.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.8,
+        metabolicHeat: 93.2, equipmentHeat: 3.2, dhwDemand: 5.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 16. Parking (was 33)
-    "16_parking": {
-        id: "16_parking", name: "16 주차장 (지하/건물)",
-        version: "2025",
-        usageHoursStart: 9, usageHoursEnd: 24,
-        dailyUsageHours: 15.0, annualUsageDays: 365.0,
-        usageHoursDay: 3298.0, usageHoursNight: 2177.0,
-        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 75.0, workplaneHeight: 0.2,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.8,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "-",
-        minOutdoorAir: 16.0, minOutdoorAirFlow: 0.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0
-    },
-    // 17. Workshop Light (was 22.3)
-    "17_workshop_light": {
-        id: "17_workshop_light", name: "17 작업장 (경작업/조립)",
-        version: "2025",
-        usageHoursStart: 7, usageHoursEnd: 16,
-        dailyUsageHours: 9.0, annualUsageDays: 230.0,
-        usageHoursDay: 2018.0, usageHoursNight: 52.0,
-        hvacDailyOperationHours: 10.0, hvacAnnualOperationDays: 230.0,
-        illuminance: 500.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 0.85, lightingAbsenceFactor: 0.1,
-        partialOperationFactorLighting: 0.9,
-        heatingSetpoint: 20.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 18.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 1.5, minOutdoorAirFlow: 0.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 35.0, equipmentHeat: 300.0, dhwDemand: 10.0
-    },
-    // 17.1 Workshop Medium (Bonus, was 22.2)
+
+    // 17.1 Workshop Medium
     "17_1_workshop_medium": {
         id: "17_1_workshop_medium", name: "17.1 작업장 (중간 강도)",
         version: "2025",
@@ -383,13 +434,95 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 15.0, coolingDesignMaxTemp: 28.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 2.5, minOutdoorAirFlow: 0.0,
+        minOutdoorAir: 2.5,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 45.0, equipmentHeat: 300.0, dhwDemand: 10.0
+        metabolicHeat: 45.0, equipmentHeat: 300.0, dhwDemand: 10.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
     },
-    // 18. Workshop Heavy (was 22.1)
-    "18_workshop_heavy": {
-        id: "18_workshop_heavy", name: "18 작업장 (중작업)",
+    // 18. Ancillary No Common (Nebenflächen ohne Aufenthaltsräume) - Table A.18
+    "18_ancillary_no_common": {
+        id: "18_ancillary_no_common", name: "18 부속 공간 (비상주)",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2750.0, usageHoursNight: 0.0,
+        hvacDailyOperationHours: 11.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 100.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.9,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 0.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.2, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 19. Traffic Area (Verkehrsfläche) - Table A.19
+    "19_traffic_area": {
+        id: "19_traffic_area", name: "19 복도/이동 공간",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2750.0, usageHoursNight: 0.0,
+        hvacDailyOperationHours: 11.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 100.0, workplaneHeight: 0.2,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.8,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 0.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
+    },
+
+    // 20. Storage/Technical (Lager, Technik, Archiv) - Table A.20
+    "20_storage_technical": {
+        id: "20_storage_technical", name: "20 창고/기계실 (저장/설비)",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2750.0, usageHoursNight: 0.0,
+        hvacDailyOperationHours: 11.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 100.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.98,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 0.15,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
+    },
+
+    // 21. Data Center (Rechenzentrum) - Table A.21
+    "21_data_center": {
+        id: "21_data_center", name: "21 데이터 센터 (전산실)",
+        version: "2025",
+        usageHoursStart: 0, usageHoursEnd: 24,
+        dailyUsageHours: 24.0, annualUsageDays: 365.0,
+        usageHoursDay: 4407.0, usageHoursNight: 4353.0,
+        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
+        illuminance: 500.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.96, lightingAbsenceFactor: 0.5,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 1.3,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 2.8, equipmentHeat: 150.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -0.5 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 22. Industrial Heavy (Gewerbliche/Ind. Hallen - schwere Arbeit) - Table A.22
+    "22_industrial_heavy": {
+        id: "22_industrial_heavy", name: "22 공장/홀 (중작업)",
         version: "2025",
         usageHoursStart: 7, usageHoursEnd: 16,
         dailyUsageHours: 9.0, annualUsageDays: 230.0,
@@ -397,209 +530,83 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         hvacDailyOperationHours: 10.0, hvacAnnualOperationDays: 230.0,
         illuminance: 300.0, workplaneHeight: 0.8,
         illuminanceDepreciationFactor: 0.85, lightingAbsenceFactor: 0.1,
-        partialOperationFactorLighting: 0.9,
+        partialOperationFactorLighting: 1.0,
         heatingSetpoint: 15.0, coolingSetpoint: 28.0,
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 15.0, coolingDesignMaxTemp: 30.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 3.5, minOutdoorAirFlow: 0.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 3.5,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 50.0, equipmentHeat: 300.0, dhwDemand: 10.0
+        metabolicHeat: 6.0, equipmentHeat: 35.0, dhwDemand: 10.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.2, a: -1.8 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 19. Gym (was 31)
-    "19_gym": {
-        id: "19_gym", name: "19 스포츠 홀 (체육관)",
+
+    // 23. Industrial Medium (Gewerbliche/Ind. Hallen - mittelschwere Arbeit) - Table A.23
+    "23_industrial_medium": {
+        id: "23_industrial_medium", name: "23 공장/홀 (중간 작업)",
         version: "2025",
-        usageHoursStart: 8, usageHoursEnd: 23,
-        dailyUsageHours: 15.0, annualUsageDays: 250.0,
-        usageHoursDay: 2509.0, usageHoursNight: 1241.0,
-        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 250.0,
-        illuminance: 300.0, workplaneHeight: 0.0,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.3,
+        usageHoursStart: 7, usageHoursEnd: 16,
+        dailyUsageHours: 9.0, annualUsageDays: 230.0,
+        usageHoursDay: 2018.0, usageHoursNight: 52.0,
+        hvacDailyOperationHours: 10.0, hvacAnnualOperationDays: 230.0,
+        illuminance: 500.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.85, lightingAbsenceFactor: 0.1,
         partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetpoint: 17.0, coolingSetpoint: 26.0,
         heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "-",
-        minOutdoorAir: 3.0, minOutdoorAirFlow: 1.25,
-        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.9,
-        metabolicHeat: 65.0, equipmentHeat: 5.0, dhwDemand: 50.0
+        heatingDesignMinTemp: 15.0, coolingDesignMaxTemp: 28.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 2.5,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 5.0, equipmentHeat: 35.0, dhwDemand: 10.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.2, a: -1.8 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 20. Fitness (was 35)
-    "20_fitness": {
-        id: "20_fitness", name: "20 피트니스/체조",
+
+    // 24. Industrial Light (Gewerbliche/Ind. Hallen - leichte Arbeit) - Table A.24
+    "24_industrial_light": {
+        id: "24_industrial_light", name: "24 공장/홀 (경작업/좌식)",
         version: "2025",
-        usageHoursStart: 8, usageHoursEnd: 23,
-        dailyUsageHours: 15.0, annualUsageDays: 365.0,
-        usageHoursDay: 3663.0, usageHoursNight: 1812.0,
-        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 300.0, workplaneHeight: 0.0,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
+        usageHoursStart: 7, usageHoursEnd: 16,
+        dailyUsageHours: 9.0, annualUsageDays: 230.0,
+        usageHoursDay: 2018.0, usageHoursNight: 52.0,
+        hvacDailyOperationHours: 10.0, hvacAnnualOperationDays: 230.0,
+        illuminance: 500.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.85, lightingAbsenceFactor: 0.1,
         partialOperationFactorLighting: 1.0,
         heatingSetpoint: 20.0, coolingSetpoint: 24.0,
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 18.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 12.0, minOutdoorAirFlow: 2.5,
-        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.9,
-        metabolicHeat: 280.0, equipmentHeat: 30.0, dhwDemand: 120.0
-    },
-    // 21. Pool (Placeholder - new)
-    "21_pool": {
-        id: "21_pool", name: "21 수영장 (실내)",
-        version: "2025",
-        usageHoursStart: 8, usageHoursEnd: 22,
-        dailyUsageHours: 14.0, annualUsageDays: 365.0,
-        usageHoursDay: 3600.0, usageHoursNight: 1510.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 200.0, workplaneHeight: 0.0,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 26.0, coolingSetpoint: 28.0,
-        heatingSetbackTemp: 24.0,
-        heatingDesignMinTemp: 26.0, coolingDesignMaxTemp: 30.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 10.0, minOutdoorAirFlow: 5.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 100.0, equipmentHeat: 10.0, dhwDemand: 200.0
-    },
-    // 22. Lab (was 36)
-    "22_lab": {
-        id: "22_lab", name: "22 실험실",
-        version: "2025",
-        usageHoursStart: 7, usageHoursEnd: 18,
-        dailyUsageHours: 11.0, annualUsageDays: 250.0,
-        usageHoursDay: 2543.0, usageHoursNight: 207.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 250.0,
-        illuminance: 500.0, workplaneHeight: 1.0,
-        illuminanceDepreciationFactor: 0.92, lightingAbsenceFactor: 0.3,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 22.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 25.0, minOutdoorAirFlow: 0.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 1.5,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 40.0, equipmentHeat: 115.0, dhwDemand: 10.0
+        metabolicHeat: 4.0, equipmentHeat: 35.0, dhwDemand: 10.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.2, a: -1.8 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 23. Exam Room (was 37)
-    "23_exam_room": {
-        id: "23_exam_room", name: "23 진료실/검사실",
+
+    // 25. Audience Area (Zuschauerbereich) - Table A.25
+    "25_audience_area": {
+        id: "25_audience_area", name: "25 관람석 (극장/공연장)",
         version: "2025",
-        usageHoursStart: 7, usageHoursEnd: 18,
-        dailyUsageHours: 11.0, annualUsageDays: 250.0,
-        usageHoursDay: 2543.0, usageHoursNight: 207.0,
-        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
-        illuminance: 500.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 22.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 0.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 10.0, minOutdoorAirFlow: 2.5,
-        hvacAbsenceFactor: 0.3, hvacPartialOperationFactor: 0.7,
-        metabolicHeat: 88.0, equipmentHeat: 40.0, dhwDemand: 10.0
-    },
-    // 24. ICU (was 38)
-    "24_icu": {
-        id: "24_icu", name: "24 특수 간호/중환자실",
-        version: "2025",
-        usageHoursStart: 0, usageHoursEnd: 24,
-        dailyUsageHours: 24.0, annualUsageDays: 365.0,
-        usageHoursDay: 4407.0, usageHoursNight: 4353.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 300.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
-        partialOperationFactorLighting: 0.8,
-        heatingSetpoint: 24.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 0.0,
-        heatingDesignMinTemp: 22.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 30.0, minOutdoorAirFlow: 0.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 150.0, equipmentHeat: 240.0, dhwDemand: 120.0
-    },
-    // 25. Corridor Care (was 19)
-    "25_corridor_care": {
-        id: "25_corridor_care", name: "25 복도 (병동/의료)",
-        version: "2025",
-        usageHoursStart: 7, usageHoursEnd: 18,
-        dailyUsageHours: 11.0, annualUsageDays: 250.0,
-        usageHoursDay: 2543.0, usageHoursNight: 207.0,
-        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
-        illuminance: 100.0, workplaneHeight: 0.2,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.8,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 0.001, minOutdoorAirFlow: 0.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0
-    },
-    // 26. Medical Practice (was 40)
-    "26_medical_practice": {
-        id: "26_medical_practice", name: "26 개인 병원/진료소",
-        version: "2025",
-        usageHoursStart: 8, usageHoursEnd: 18,
-        dailyUsageHours: 10.0, annualUsageDays: 250.0,
-        usageHoursDay: 2346.0, usageHoursNight: 154.0,
-        hvacDailyOperationHours: 12.0, hvacAnnualOperationDays: 250.0,
-        illuminance: 500.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 22.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 10.0, minOutdoorAirFlow: 2.5,
-        hvacAbsenceFactor: 0.3, hvacPartialOperationFactor: 0.7,
-        metabolicHeat: 75.0, equipmentHeat: 30.0, dhwDemand: 10.0
-    },
-    // 27. Exhibition (was 27)
-    "27_exhibition": {
-        id: "27_exhibition", name: "27 전시실/박물관",
-        version: "2025",
-        usageHoursStart: 10, usageHoursEnd: 18,
-        dailyUsageHours: 8.0, annualUsageDays: 250.0,
-        usageHoursDay: 1846.0, usageHoursNight: 154.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
+        usageHoursStart: 19, usageHoursEnd: 23,
+        dailyUsageHours: 4.0, annualUsageDays: 250.0,
+        usageHoursDay: 59.0, usageHoursNight: 941.0,
+        hvacDailyOperationHours: 6.0, hvacAnnualOperationDays: 250.0,
         illuminance: 200.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 0.88, lightingAbsenceFactor: 0.0,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "o. T.",
-        minOutdoorAir: 2.0, minOutdoorAirFlow: 2.0,
-        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 30.0, equipmentHeat: 5.0, dhwDemand: 0.0
-    },
-    // 28. Trade Fair (was 26 Stage?) - Assuming 'Messe'
-    "28_trade_fair": {
-        id: "28_trade_fair", name: "28 전시회장/메세 (Messe)",
-        version: "2025",
-        usageHoursStart: 13, usageHoursEnd: 18,
-        dailyUsageHours: 9.0, annualUsageDays: 150.0,
-        usageHoursDay: 1258.0, usageHoursNight: 92.0,
-        hvacDailyOperationHours: 11.0, hvacAnnualOperationDays: 150.0,
-        illuminance: 300.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 0.93, lightingAbsenceFactor: 0.5,
+        illuminanceDepreciationFactor: 0.97, lightingAbsenceFactor: 0.0,
         partialOperationFactorLighting: 1.0,
         heatingSetpoint: 21.0, coolingSetpoint: 24.0,
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 7.0, minOutdoorAirFlow: 2.5,
+        minOutdoorAir: 40.0,
         hvacAbsenceFactor: 0.7, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 145.0, equipmentHeat: 15.0, dhwDemand: 0.0
+        metabolicHeat: 93.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 29-32 Placeholders or Extensions
-    // 33. Foyer (was 24)
-    "33_foyer": {
-        id: "33_foyer", name: "33 풍실 (Windfang)/로비",
+
+    // 26. Theater Foyer (Theater - Foyer) - Table A.26
+    "26_theater_foyer": {
+        id: "26_theater_foyer", name: "26 극장 로비 (포이어)",
         version: "2025",
         usageHoursStart: 19, usageHoursEnd: 23,
         dailyUsageHours: 4.0, annualUsageDays: 250.0,
@@ -612,51 +619,199 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 25.0, minOutdoorAirFlow: 5.0,
+        minOutdoorAir: 25.0,
         hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 95.0, equipmentHeat: 5.0, dhwDemand: 5.0
+        metabolicHeat: 87.5, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.3, a: -0.5 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 34. Retail Refrig (was 7)
-    "34_retail_refrig": {
-        id: "34_retail_refrig", name: "34 판매 (냉장)",
+
+    // 27. Stage (Bühne - Theater/Veranstaltung) - Table A.27
+    "27_stage": {
+        id: "27_stage", name: "27 무대 (극장/공연장)",
+        version: "2025",
+        usageHoursStart: 13, usageHoursEnd: 23,
+        dailyUsageHours: 10.0, annualUsageDays: 250.0,
+        usageHoursDay: 1259.0, usageHoursNight: 1241.0,
+        hvacDailyOperationHours: 12.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 750.0, workplaneHeight: 0.0,
+        illuminanceDepreciationFactor: 0.9, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 0.3,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
+    },
+
+    // 28. Trade Fair/Congress (Messe/Kongress) - Table A.28
+    "28_trade_fair_congress": {
+        id: "28_trade_fair_congress", name: "28 전시회장/메세 (박람회)",
+        version: "2025",
+        usageHoursStart: 9, usageHoursEnd: 18,
+        dailyUsageHours: 9.0, annualUsageDays: 150.0,
+        usageHoursDay: 1258.0, usageHoursNight: 92.0,
+        hvacDailyOperationHours: 11.0, hvacAnnualOperationDays: 150.0,
+        illuminance: 300.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.93, lightingAbsenceFactor: 0.5,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 7.0,
+        hvacAbsenceFactor: 0.7, hvacPartialOperationFactor: 1.0,
+        metabolicHeat: 23.3, equipmentHeat: 2.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 2.0, c: 0.0, b: -1.5, a: -2.0 }, fAdapt: { d: 0.5, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 29. Exhibition/Museum (Ausstellungsräume und Museum) - Table A.29
+    "29_exhibition_museum": {
+        id: "29_exhibition_museum", name: "29 전시실/박물관 (보존 요구)",
+        version: "2025",
+        usageHoursStart: 10, usageHoursEnd: 18,
+        dailyUsageHours: 8.0, annualUsageDays: 250.0,
+        usageHoursDay: 1846.0, usageHoursNight: 154.0,
+        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
+        illuminance: 200.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 0.88, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "o.T.",
+        minOutdoorAir: 2.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
+        metabolicHeat: 7.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
+    },
+    // 49. Library (placeholder if needed, currently empty as 29 was missing)
+    // "49_library": { ... },
+
+    // 30. Library - Reading Room (Bibliothek - Lesesaal) - Table A.30
+    "30_library_reading": {
+        id: "30_library_reading", name: "30 도서관 (열람실)",
         version: "2025",
         usageHoursStart: 8, usageHoursEnd: 20,
         dailyUsageHours: 12.0, annualUsageDays: 300.0,
         usageHoursDay: 3009.0, usageHoursNight: 591.0,
         hvacDailyOperationHours: 14.0, hvacAnnualOperationDays: 300.0,
-        illuminance: 300.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 0.93, lightingAbsenceFactor: 0.0,
-        partialOperationFactorLighting: 1.0,
-        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 4.0, minOutdoorAirFlow: 2.5,
-        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
-        metabolicHeat: 88.0, equipmentHeat: 25.0, dhwDemand: 5.0
-    },
-    // 35. Kitchen High (Extension) - Placeholder, same as 13 for now
-    "35_kitchen_high": {
-        id: "35_kitchen_high", name: "35 주방 (고부하)",
-        version: "2025",
-        usageHoursStart: 10, usageHoursEnd: 23,
-        dailyUsageHours: 13.0, annualUsageDays: 300.0,
-        usageHoursDay: 2411.0, usageHoursNight: 1489.0,
-        hvacDailyOperationHours: 15.0, hvacAnnualOperationDays: 300.0,
         illuminance: 500.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 0.96, lightingAbsenceFactor: 0.0,
+        illuminanceDepreciationFactor: 0.88, lightingAbsenceFactor: 0.0,
         partialOperationFactorLighting: 1.0,
         heatingSetpoint: 21.0, coolingSetpoint: 24.0,
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 120.0, minOutdoorAirFlow: 0.0, // Higher air
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 60.0, equipmentHeat: 2500.0, dhwDemand: 800.0 // Higher load
+        minOutdoorAir: 8.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
+        metabolicHeat: 28.0, equipmentHeat: 6.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
     },
-    // 36. Hotel Spa (Extension) - use Sauna logic
-    "36_hotel_wellness": {
-        id: "36_hotel_wellness", name: "36 호텔 웰니스/스파",
+    // 31. Library - Open Access (Bibliothek - Freihandbereich) - Table A.31
+    "31_library_open_access": {
+        id: "31_library_open_access", name: "31 도서관 (개가식 서고)",
+        version: "2025",
+        usageHoursStart: 8, usageHoursEnd: 20,
+        dailyUsageHours: 12.0, annualUsageDays: 300.0,
+        usageHoursDay: 3009.0, usageHoursNight: 591.0,
+        hvacDailyOperationHours: 14.0, hvacAnnualOperationDays: 300.0,
+        illuminance: 200.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 2.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
+        metabolicHeat: 7.0, equipmentHeat: 6.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
+    },
+    // 32. Library - Stack/Depot (Bibliothek - Magazin und Depot) - Table A.32
+    "32_library_stack": {
+        id: "32_library_stack", name: "32 도서관 (보존 서고/수장고)",
+        version: "2025",
+        usageHoursStart: 8, usageHoursEnd: 20,
+        dailyUsageHours: 12.0, annualUsageDays: 300.0,
+        usageHoursDay: 3009.0, usageHoursNight: 591.0,
+        hvacDailyOperationHours: 14.0, hvacAnnualOperationDays: 300.0,
+        illuminance: 100.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.9,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 2.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 1.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9
+    },
+
+    // 33. Sports Hall (Turnhalle - ohne Zuschauer) - Table A.33
+    "33_sports_hall": {
+        id: "33_sports_hall", name: "33 체육관 (관람석 없음)",
+        version: "2025",
+        usageHoursStart: 8, usageHoursEnd: 23,
+        dailyUsageHours: 15.0, annualUsageDays: 250.0,
+        usageHoursDay: 2509.0, usageHoursNight: 1241.0,
+        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 300.0, workplaneHeight: 1.0,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.3,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 19.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 3.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.9,
+        metabolicHeat: 20.0, equipmentHeat: 6.3, dhwDemand: 125.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 34. Parking - Private/Office (Parkhaus - Büro/Privat) - Table A.34
+    "34_parking_private": {
+        id: "34_parking_private", name: "34 주차장 (사무/개인)",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2543.0, usageHoursNight: 207.0,
+        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 75.0, workplaneHeight: 0.2,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.95,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 8.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 35. Parking - Public (Parkhaus - Öffentlich) - Table A.35
+    "35_parking_public": {
+        id: "35_parking_public", name: "35 주차장 (공공)",
+        version: "2025",
+        usageHoursStart: 9, usageHoursEnd: 24,
+        dailyUsageHours: 24.0, annualUsageDays: 365.0,
+        usageHoursDay: 3298.0, usageHoursNight: 2177.0,
+        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 365.0,
+        illuminance: 75.0, workplaneHeight: 0.2,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.8,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 8.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 36. Sauna Area (Saunabereich) - Table A.36
+    "36_sauna_area": {
+        id: "36_sauna_area", name: "36 사우나 구역",
         version: "2025",
         usageHoursStart: 10, usageHoursEnd: 22,
         dailyUsageHours: 12.0, annualUsageDays: 365.0,
@@ -665,133 +820,226 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
         illuminance: 200.0, workplaneHeight: 0.0,
         illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
         partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 24.0, coolingSetpoint: 24.0, // Cooling not typically required but valid for calculation
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 23.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 15.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 5.8, equipmentHeat: 50.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+    // Table A.36: Metabolic: 12m2/person -> 70W/person? No, check table again.
+    // Table: max Belegungsdichte 18/12/6 m2/Person.
+    // Interne Wärmequellen: Personen 70W -> 3.9 / 5.8 / 11.7.
+    // Arbeitshilfen (Equipment): 40 / 50 / 60 W/m2.
+    // Let's use Medium (mittel) as default usually? Table 36: mittel -> 5.8 (Person), 50 (Equip).
+    // Total Heat day (Wh/m2d): 558.
+    // My previous file used specific values. I will stick to "Medium" column values unless standard suggests otherwise.
+    // Metabolic: 5.8 W/m2. Equipment: 50 W/m2.
+
+
+    // 37. Fitness Room (Fitnessraum) - Table A.37
+    "37_fitness_room": {
+        id: "37_fitness_room", name: "37 피트니스 룸",
+        version: "2025",
+        usageHoursStart: 8, usageHoursEnd: 23,
+        dailyUsageHours: 15.0, annualUsageDays: 365.0,
+        usageHoursDay: 3663.0, usageHoursNight: 1812.0,
+        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 365.0,
+        illuminance: 300.0, workplaneHeight: 0.0,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 20.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 18.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 12.0,
+        hvacAbsenceFactor: 0.5, hvacPartialOperationFactor: 0.9,
+        metabolicHeat: 22.0, equipmentHeat: 2.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+        // Table A.37: Mittel: Person 22 W/m2, Equipment 2 W/m2.
+    },
+
+
+    // 38. Laboratory (Labor) - Table A.38
+    "38_laboratory": {
+        id: "38_laboratory", name: "38 실험실 (일반)",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2543.0, usageHoursNight: 207.0,
+        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 500.0, workplaneHeight: 1.0,
+        illuminanceDepreciationFactor: 0.92, lightingAbsenceFactor: 0.3,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 22.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 4.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 25.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 6.4, equipmentHeat: 18.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+        // Table A.38: Mittel: Person 6.4 W/m2, Equipment 18 W/m2.
+    },
+
+    // 39. Examination/Treatment (Untersuchungs- und Behandlungsräume) - Table A.39
+    "39_exam_treatment": {
+        id: "39_exam_treatment", name: "39 검사/치료실",
+        version: "2025",
+        usageHoursStart: 7, usageHoursEnd: 18,
+        dailyUsageHours: 11.0, annualUsageDays: 250.0,
+        usageHoursDay: 2543.0, usageHoursNight: 207.0,
+        hvacDailyOperationHours: 13.0, hvacAnnualOperationDays: 250.0,
+        illuminance: 500.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 22.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 0.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "m.T.",
+        minOutdoorAir: 10.0,
+        hvacAbsenceFactor: 0.3, hvacPartialOperationFactor: 0.7,
+        metabolicHeat: 11.7, equipmentHeat: 7.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 40. Special Care (Spezialpflegebereiche: ICU etc) - Table A.40
+    "40_special_care": {
+        id: "40_special_care", name: "40 특수 간호/중환자실",
+        version: "2025",
+        usageHoursStart: 0, usageHoursEnd: 24,
+        dailyUsageHours: 24.0, annualUsageDays: 365.0,
+        usageHoursDay: 4407.0, usageHoursNight: 4353.0,
+        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
+        illuminance: 300.0, workplaneHeight: 0.8,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
         heatingSetpoint: 24.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 23.0, coolingDesignMaxTemp: 0.0,
+        heatingSetbackTemp: 0.0,
+        heatingDesignMinTemp: 22.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 15.0, minOutdoorAirFlow: 0.0,
+        minOutdoorAir: 30.0,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 65.0, equipmentHeat: 510.0, dhwDemand: 1000.0
+        metabolicHeat: 4.7, equipmentHeat: 9.5, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 38. Server (Extension) - Placeholder
-    "38_server": {
-        id: "38_server", name: "38 서버룸",
+
+    // 41. Corridors - General Care (Flure des allg. Pflegebereichs) - Table A.41
+    "41_corridor_care": {
+        id: "41_corridor_care", name: "41 복도 (일반 간호 구역)",
         version: "2025",
         usageHoursStart: 0, usageHoursEnd: 24,
         dailyUsageHours: 24.0, annualUsageDays: 365.0,
         usageHoursDay: 4407.0, usageHoursNight: 4353.0,
         hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
+        illuminance: 125.0, workplaneHeight: 0.2,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.8,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 22.0, coolingSetpoint: 24.0,
+        heatingSetbackTemp: 0.0,
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 10.0,
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+    },
+
+    // 42. Medical Practice/Therapy (Arztpraxen und Therapeutische Praxen) - Table A.42
+    "42_medical_practice": {
+        id: "42_medical_practice", name: "42 병원/진료소",
+        version: "2025",
+        usageHoursStart: 8, usageHoursEnd: 18,
+        dailyUsageHours: 10.0, annualUsageDays: 250.0,
+        usageHoursDay: 2346.0, usageHoursNight: 154.0,
+        hvacDailyOperationHours: 12.0, hvacAnnualOperationDays: 250.0,
         illuminance: 500.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 0.96, lightingAbsenceFactor: 0.5,
-        partialOperationFactorLighting: 0.5,
-        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.3,
+        partialOperationFactorLighting: 0.7,
+        heatingSetpoint: 22.0, coolingSetpoint: 24.0,
         heatingSetbackTemp: 4.0,
         heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
         humidityRequirement: "m.T.",
-        minOutdoorAir: 1.3, minOutdoorAirFlow: 0.0,
+        minOutdoorAir: 10.0,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 20.0, equipmentHeat: 1500.0, dhwDemand: 0.0
+        metabolicHeat: 5.8, equipmentHeat: 5.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
     },
-    // 39. Datacenter (was 21)
-    "39_datacenter": {
-        id: "39_datacenter", name: "39 데이터 센터",
+
+    // 43. Warehouses/Logistics (Lagerhallen, Logistikhallen) - Table A.43
+    "43_storage": {
+        id: "43_storage", name: "43 창고/물류 (Lagerhallen)",
         version: "2025",
         usageHoursStart: 0, usageHoursEnd: 24,
         dailyUsageHours: 24.0, annualUsageDays: 365.0,
         usageHoursDay: 4407.0, usageHoursNight: 4353.0,
         hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 500.0, workplaneHeight: 0.8,
-        illuminanceDepreciationFactor: 0.96, lightingAbsenceFactor: 0.5,
-        partialOperationFactorLighting: 0.5,
-        heatingSetpoint: 21.0, coolingSetpoint: 24.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
-        humidityRequirement: "m.T.",
-        minOutdoorAir: 1.3, minOutdoorAirFlow: 0.0,
-        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 20.0, equipmentHeat: 2000.0, dhwDemand: 0.0
-    },
-    // 41. Logistics (was 41)
-    "41_logistics": {
-        id: "41_logistics", name: "41 물류 창고",
-        version: "2025",
-        usageHoursStart: 0, usageHoursEnd: 24,
-        dailyUsageHours: 24.0, annualUsageDays: 365.0,
-        usageHoursDay: 4407.0, usageHoursNight: 4353.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 150.0, workplaneHeight: 0.0,
+        illuminance: 200.0, workplaneHeight: 0.0,
         illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.6,
         partialOperationFactorLighting: 0.4,
         heatingSetpoint: 12.0, coolingSetpoint: 26.0,
         heatingSetbackTemp: 0.0,
         heatingDesignMinTemp: 12.0, coolingDesignMaxTemp: 28.0,
-        humidityRequirement: "-",
-        minOutdoorAir: 1.0, minOutdoorAirFlow: 0.0,
+        humidityRequirement: "keine",
+        minOutdoorAir: 1.0,
         hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
-        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0
+        metabolicHeat: 0.0, equipmentHeat: 0.0, dhwDemand: 0.0, reductionFactorPollution: 0.9, pollutionFactor: 0.9,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+        // Table A.43: Internal heat negligible/ "-"
     },
-    // 42. Residential Single (was 42)
-    "42_res_single": {
-        id: "42_res_single", name: "42 주거 (단독 주택)",
+
+    // 44. Residential Single (Single Family) - Table 5 (Wohngebäude)
+    "44_res_single": {
+        id: "44_res_single", name: "44 주거 (단독 주택 / EFH)",
         version: "2025",
         usageHoursStart: 0, usageHoursEnd: 24,
         dailyUsageHours: 24.0, annualUsageDays: 365.0,
         usageHoursDay: 4407.0, usageHoursNight: 4353.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 200.0, workplaneHeight: 0.0,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.58,
-        partialOperationFactorLighting: 0.9,
-        heatingSetpoint: 20.0, coolingSetpoint: 26.0,
+        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 365.0, // Heating 06:00-23:00
+        illuminance: 200.0, workplaneHeight: 0.0, // Not defined in Table 5, assumed specific or 0.
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 20.0, coolingSetpoint: 25.0,
         heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 28.0,
-        humidityRequirement: "m. T.",
-        minOutdoorAir: 1.0, minOutdoorAirFlow: 0.5,
-        hvacAbsenceFactor: 0.13, hvacPartialOperationFactor: 0.7,
-        metabolicHeat: 22.0, equipmentHeat: 31.0, dhwDemand: 45.0
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "-",
+        minOutdoorAir: 1.25, // 0.5 h^-1 * 2.5m = 1.25 m3/m2h
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 1.9, equipmentHeat: 0.0, dhwDemand: 45.0, reductionFactorPollution: 0.95,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+        // Table 5: q_I = 45 Wh/(m2d). 45/24 = 1.875 W/m2. F_V = 0.95.
+        // DHW: ~16.5 kWh/m2a ~ 45 Wh/m2d.
     },
-    // 43. Residential Multi (was 43)
-    "43_res_multi": {
-        id: "43_res_multi", name: "43 주거 (공동 주택)",
+
+    // 45. Residential Multi (Apartment) - Table 5 (Wohngebäude)
+    "45_res_multi": {
+        id: "45_res_multi", name: "45 주거 (공동 주택 / MFH)",
         version: "2025",
         usageHoursStart: 0, usageHoursEnd: 24,
         dailyUsageHours: 24.0, annualUsageDays: 365.0,
         usageHoursDay: 4407.0, usageHoursNight: 4353.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
+        hvacDailyOperationHours: 17.0, hvacAnnualOperationDays: 365.0, // Heating 06:00-23:00
         illuminance: 200.0, workplaneHeight: 0.0,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.5,
-        partialOperationFactorLighting: 0.9,
-        heatingSetpoint: 20.0, coolingSetpoint: 26.0,
+        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.0,
+        partialOperationFactorLighting: 1.0,
+        heatingSetpoint: 20.0, coolingSetpoint: 25.0,
         heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 28.0,
-        humidityRequirement: "m. T.",
-        minOutdoorAir: 1.0, minOutdoorAirFlow: 0.5,
-        hvacAbsenceFactor: 0.13, hvacPartialOperationFactor: 0.7,
-        metabolicHeat: 33.0, equipmentHeat: 75.0, dhwDemand: 45.0
-    },
-    // 44. Dorm (was 44)
-    "44_dorm": {
-        id: "44_dorm", name: "44 기숙사/고시원",
-        version: "2025",
-        usageHoursStart: 0, usageHoursEnd: 24,
-        dailyUsageHours: 24.0, annualUsageDays: 365.0,
-        usageHoursDay: 4407.0, usageHoursNight: 4353.0,
-        hvacDailyOperationHours: 24.0, hvacAnnualOperationDays: 365.0,
-        illuminance: 200.0, workplaneHeight: 0.0,
-        illuminanceDepreciationFactor: 1.0, lightingAbsenceFactor: 0.54,
-        partialOperationFactorLighting: 0.9,
-        heatingSetpoint: 20.0, coolingSetpoint: 26.0,
-        heatingSetbackTemp: 4.0,
-        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 28.0,
-        humidityRequirement: "m. T.",
-        minOutdoorAir: 1.0, minOutdoorAirFlow: 0.5,
-        hvacAbsenceFactor: 0.13, hvacPartialOperationFactor: 0.7,
-        metabolicHeat: 28.0, equipmentHeat: 55.0, dhwDemand: 30.0
+        heatingDesignMinTemp: 20.0, coolingDesignMaxTemp: 26.0,
+        humidityRequirement: "-",
+        minOutdoorAir: 1.25, // 0.5 h^-1 * 2.5m = 1.25 m3/m2h
+        hvacAbsenceFactor: 0.0, hvacPartialOperationFactor: 0.0,
+        metabolicHeat: 3.8, equipmentHeat: 0.0, dhwDemand: 45.0, reductionFactorPollution: 0.95,
+        deltaThetaEMS: { d: 0.0, c: 0.0, b: -0.5, a: -1.0 }, fAdapt: { d: 1.0, c: 1.0, b: 1.35, a: 1.35 }
+        // Table 5: q_I = 90 Wh/(m2d). 90/24 = 3.75 W/m2. F_V = 0.95.
+        // DHW: Assumed same ~45 Wh/m2d default.
     },
 };
 
 export const PROFILE_OPTIONS = Object.values(DIN_18599_PROFILES).sort((a, b) => {
     // Sort by Number in name
-    const numA = parseFloat(a.name.split(' ')[0]); // Parse float to handle 17.1
+    const numA = parseFloat(a.name.split(' ')[0]);
     const numB = parseFloat(b.name.split(' ')[0]);
 
     if (isNaN(numA) && isNaN(numB)) return a.name.localeCompare(b.name);

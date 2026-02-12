@@ -1,8 +1,10 @@
 import { ClimateData, HourlyClimate, MonthlyClimate } from "./types";
+import { parseEPW, EPWHourlyData } from "@/lib/epw-parser";
 
 // 서울 기상 데이터 (대표 기상년 근사치)
 const SEOUL_CLIMATE: ClimateData = {
     name: "서울",
+    latitude: 37.5,
     monthly: [
         { month: 1, Te: -2.4, Is_Horiz: 65 },  // 1월
         { month: 2, Te: 0.4, Is_Horiz: 90 },   // 2월
@@ -146,11 +148,75 @@ export async function loadClimateData(stationId: number): Promise<ClimateData> {
         // ClimateData 인터페이스 형식 보장
         const baseName = data.name || data.metadata?.name || `Station ${stationId}`;
         const displayName = STATION_NAME_MAP[stationId] || baseName;
+        const latitude = data.latitude || data.metadata?.latitude || 37.5;
+
+        let hourlyData: HourlyClimate[] | undefined = data.hourly;
+
+        // EPW 파일이 있고 fetch 가능한 경우 로드
+        if (data.filename) {
+            try {
+                const epwResponse = await fetch(`/epw/${data.filename}`);
+                if (epwResponse.ok) {
+                    const epwText = await epwResponse.text();
+                    const parsedEPW = parseEPW(epwText);
+
+                    // EPW 데이터를 HourlyClimate 형식으로 변환
+                    hourlyData = parsedEPW.hourly.map(h => {
+                        // 날짜로부터 Day of Year 계산 (Approximate)
+                        // Note: epw-parser returns standard dates.
+                        // We can calculate rough hourOfYear or use strictly from index if sequential.
+                        // EPW usually starts Jan 1st 01:00.
+
+                        // Solar Geometry is calculated in Calculator, but we need basic params.
+                        // HourlyClimate definition: 
+                        // Te, I_beam, I_diff are critical.
+                        // I_beam in Calculator expects Horizontal or Normal?
+                        // generateDailyProfile logic: I_beam = I_global * (1 - k_d) -> Horizontal.
+                        // calculateHourlyRadiationDetailed logic:
+                        // input Ib is "Horizontal Beam" or "Normal Beam"?
+                        // comment line 1774: "Ib: number, // 수평면 직달일사 (W/m2)"
+                        // So we must provide Horizontal Beam.
+                        // EPW provides Direct Normal ($I_{bn}$).
+                        // Relation: $I_{bh} = I_{bn} * \sin(\alpha)$.
+                        // BUT, calculator calculates alpha internally.
+                        // If we pass $I_{bn}$ as $I_b$ to `calculateHourlyRadiationDetailed`, 
+                        // line 1829: `Ib_surf = Ib * Rb`.
+                        // Rb = max(cos, 0) / max(sin, 0) approx cos(theta)/sin(alpha).
+                        // Ib * Rb = Ib_horiz * (cos_theta / sin_alpha) = (I_bn * sin_alpha) * (cos_theta / sin_alpha) = I_bn * cos_theta. CORRECT.
+                        // So the calculator EXPECTS Horizontal Beam.
+                        // We have Global Horizontal and Diffuse Horizontal from EPW.
+                        // $I_{beam_horiz} = I_{global_horiz} - I_{diffuse_horiz}$.
+                        // This is safer than converting Normal using separate solar algo.
+
+                        const I_gh = h.globalHoriz;
+                        const I_dh = h.diffuseHoriz;
+                        const I_bh = Math.max(0, I_gh - I_dh);
+
+                        return {
+                            hourOfYear: 0, // Assigned later or ignored
+                            month: h.month,
+                            day: h.day,
+                            hour: h.hour,
+                            Te: h.dryBulb,
+                            I_beam: I_bh, // Passing Horizontal Beam
+                            I_diff: I_dh,
+                            sunAltitude: 0, // Will be recalc-ed
+                            sunAzimuth: 0   // Will be recalc-ed
+                        };
+                    });
+
+                    console.log(`Loaded EPW data for ${displayName}: ${hourlyData.length} hours`);
+                }
+            } catch (e) {
+                console.warn("Failed to load EPW file:", e);
+            }
+        }
 
         return {
             name: displayName,
+            latitude: latitude,
             monthly: data.monthly,
-            hourly: data.hourly
+            hourly: hourlyData
         };
     } catch (error) {
         console.warn(`기상 데이터 로드 실패 (${stationId}), 기본 서울 데이터를 사용합니다.`, error);

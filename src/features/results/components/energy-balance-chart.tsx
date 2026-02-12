@@ -49,8 +49,9 @@ export function EnergyBalanceChart({ data, totalArea }: EnergyBalanceChartProps)
                             />
                             <Legend />
                             {/* Losses Stack */}
-                            <Bar dataKey="QT_spec" name="전도 손실" stackId="losses" fill="#3b82f6" radius={[0, 0, 4, 4]} />
-                            <Bar dataKey="QV_spec" name="환기 손실" stackId="losses" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                            {/* Heat Flows (Signed: Loss is negative, Gain is positive) */}
+                            <Bar dataKey="QT_spec" name="전도열" stackId="balance" fill="#3b82f6" />
+                            <Bar dataKey="QV_spec" name="환기열" stackId="balance" fill="#60a5fa" />
 
                             {/* Gains Stack */}
                             <Bar dataKey="QS_spec" name="일사 획득" stackId="gains" fill="#f59e0b" radius={[0, 0, 4, 4]} />

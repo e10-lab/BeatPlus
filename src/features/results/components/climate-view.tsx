@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 import { ClimateData } from "@/engine/types";
 import { loadClimateData, getClimateData } from "@/engine/climate-data";
-import { getProject } from "@/services/project-service";
+import { Project } from "@/types/project";
 import { Loader2 } from "lucide-react";
 import { ClimateAnalysisView } from "./climate-analysis-view";
 
 interface ClimateViewProps {
-    projectId: string;
+    project: Project;
 }
 
-export function ClimateView({ projectId }: ClimateViewProps) {
+export function ClimateView({ project }: ClimateViewProps) {
     const [loading, setLoading] = useState(true);
     const [weatherData, setWeatherData] = useState<ClimateData | null>(null);
 
@@ -19,8 +19,7 @@ export function ClimateView({ projectId }: ClimateViewProps) {
         const loadData = async () => {
             setLoading(true);
             try {
-                // 1. Fetch Project for Weather Station (or location)
-                const project = await getProject(projectId);
+                // 1. Project is passed via props, no need to fetch again
 
                 // 2. Load Weather Data
                 let loadedWeatherData: ClimateData | undefined;
@@ -46,7 +45,7 @@ export function ClimateView({ projectId }: ClimateViewProps) {
         };
 
         loadData();
-    }, [projectId]);
+    }, [project.weatherStationId]); // Re-run only when weatherStationId changes
 
     if (loading) {
         return (

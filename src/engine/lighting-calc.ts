@@ -46,7 +46,7 @@ export function calculateLightingDemand(
         p_j = zone.lighting.powerDensity;
     } else {
         // 조도를 통한 추정: p_j = E_m / (광효율 * 보수율 * 이용률)
-        // DIN V 18599의 간략화된 접근 방식 사용
+        // DIN/TS 18599:2025-10의 간략화된 접근 방식 사용
         const k_L = profile.illuminanceDepreciationFactor || 0.8;
         const rho = 0.6; // 일반적인 이용률 (실지수 등에 따라 변동)
         p_j = E_m / (efficacy * k_L * rho);

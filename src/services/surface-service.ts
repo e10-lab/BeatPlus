@@ -36,8 +36,8 @@ export const getSurfaces = async (projectId: string, zoneId: string): Promise<Su
     const querySnapshot = await getDocs(q);
 
     const data = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
         ...doc.data(),
+        id: doc.id, // MUST be last to override any 'id' field from doc.data()
     })) as Surface[];
 
     // Client-side sort: orderIndex asc, then name asc

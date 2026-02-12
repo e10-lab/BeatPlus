@@ -19,7 +19,7 @@ const baseZone: ZoneInput = {
         {
             id: 's1', zoneId: 'zone-1', name: 'Wall', type: 'wall_exterior',
             area: 50, uValue: 0.5, orientation: 'S', tilt: 90, absorptionCoefficient: 0.5,
-            shading: { hasDevice: false, fcValue: 1.0, type: 'external' }
+            shgc: 0.7
         } as Surface
     ],
     // High Mass

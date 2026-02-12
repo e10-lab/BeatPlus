@@ -8,14 +8,21 @@ import {
     getDocs,
     query,
     where,
-    Timestamp
+    Timestamp,
+    Firestore
 } from "firebase/firestore";
 import { db, sanitizeData } from "@/lib/firebase";
 import { Project } from "@/types/project";
 
 const PROJECTS_COLLECTION = "projects";
 
+// Helper to check if DB is initialized
+const isDbInitialized = (database: any): database is Firestore => {
+    return database && typeof database.type === 'string'; // Firestore instance usually has a type property
+};
+
 export const createProject = async (projectData: Omit<Project, "id" | "createdAt" | "updatedAt">) => {
+    if (!isDbInitialized(db)) throw new Error("Firebase DB not initialized");
     const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), sanitizeData({
         ...projectData,
         createdAt: Timestamp.now(),
@@ -25,6 +32,8 @@ export const createProject = async (projectData: Omit<Project, "id" | "createdAt
 };
 
 export const getProjects = async (userId: string): Promise<Project[]> => {
+    if (!isDbInitialized(db)) return [];
+
     const q = query(
         collection(db, PROJECTS_COLLECTION),
         where("userId", "==", userId)
@@ -32,14 +41,16 @@ export const getProjects = async (userId: string): Promise<Project[]> => {
 
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
-        id: doc.id,
         ...doc.data(),
+        id: doc.id, // MUST be last to override any 'id' field from doc.data()
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
     } as Project));
 };
 
 export const getProject = async (id: string): Promise<Project | null> => {
+    if (!isDbInitialized(db)) return null;
+
     const docRef = doc(db, PROJECTS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
 
@@ -56,6 +67,7 @@ export const getProject = async (id: string): Promise<Project | null> => {
 };
 
 export const updateProject = async (id: string, updates: Partial<Project>) => {
+    if (!isDbInitialized(db)) return;
     const docRef = doc(db, PROJECTS_COLLECTION, id);
 
     // Filter out undefined values to prevent Firestore errors
@@ -68,6 +80,7 @@ export const updateProject = async (id: string, updates: Partial<Project>) => {
 };
 
 export const deleteProject = async (id: string) => {
+    if (!isDbInitialized(db)) return;
     const docRef = doc(db, PROJECTS_COLLECTION, id);
     await deleteDoc(docRef);
 };
@@ -78,6 +91,7 @@ import { getSurfaces } from "./surface-service";
 import { calculateProjectStats, ProjectStats } from "@/lib/standard-values";
 
 export const getProjectStats = async (projectId: string): Promise<ProjectStats> => {
+    if (!isDbInitialized(db)) return {} as ProjectStats; // Return empty stats or handle as needed
     // 1. Fetch all zones
     const zones = await getZones(projectId);
 
@@ -103,6 +117,7 @@ export const updateProjectVentilation = async (
         hasALD?: boolean;
     }
 ) => {
+    if (!isDbInitialized(db)) return;
     // Sanitize config for Firestore (undefined not allowed)
     const sanitizedConfig = {
         ...config,

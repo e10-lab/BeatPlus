@@ -2,7 +2,7 @@ import { HeatingSystem, CoolingSystem, EnergyCarrier, HeatSource } from "@/types
 import { HourlyResult } from "./types";
 
 /**
- * HVAC 시스템 계산 (DIN V 18599-5 및 7 상세 구현)
+ * HVAC 시스템 계산 (DIN/TS 18599-5:2025-10 및 7 상세 구현)
  * 순 에너지 수요(Q_h, Q_c)를 최종 에너지(Q_f) 및 1차 에너지(Q_p)로 변환합니다.
  * 부분 부하 효율 및 온도 의존성을 고려한 시간별 계산을 수행합니다.
  */

@@ -6,12 +6,14 @@ import * as z from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Trash2, Plus, Info } from "lucide-react";
 import { Construction, Layer, SurfaceType } from "@/types/project";
 import { DEFAULT_MATERIALS, SURFACE_HEAT_RESISTANCE, CATEGORY_LABELS, FRAME_TYPES } from "@/lib/materials";
+import { FX_DEFAULTS } from "@/lib/standard-values";
 import { calculateStandardUValue } from "@/lib/u-value-calculator";
 import { calculateSHGC } from "@/lib/shgc-calculator";
 import { useEffect } from "react";
@@ -60,6 +62,12 @@ const constructionSchema = z.object({
     r_se: z.coerce.number().min(0),
     frameId: z.string().optional(),
     absorptionCoefficient: z.coerce.number().min(0).max(1).optional(),
+
+    // Manual Overrides
+    isUValueManual: z.boolean().optional(),
+    manualUValue: z.coerce.number().min(0).optional(),
+    isShgcManual: z.boolean().optional(),
+    manualShgc: z.coerce.number().min(0).max(1).optional(),
 });
 
 export type ConstructionFormValues = z.infer<typeof constructionSchema>;
@@ -153,8 +161,17 @@ function SortableLayerRow({ id, ...props }: SortableLayerRowProps) {
 export function ConstructionForm({ projectId, initialData, onSave, onCancel }: ConstructionFormProps) {
     const defaultFormValues: ConstructionFormValues = initialData ? {
         ...initialData,
+        // Normalize Legacy Types (Migration) to prevent Zod errors
+        type: (() => {
+            const t = initialData.type as string;
+            // Handle legacy values from DB that might not match current enum
+            if (t === "roof") return "roof_exterior";
+            if (t === "wall") return "wall_exterior";
+            if (t === "floor") return "floor_ground";
+            return initialData.type;
+        })() as any, // Cast to any to satisfy Zod enum type temporarily
         layers: initialData.layers.map(l => ({
-            id: l.id,
+            id: l.id || uuidv4(),
             materialId: l.materialId,
             thickness: l.thickness,
             customName: l.name,
@@ -162,7 +179,13 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
             customDensity: l.density,
             customSpecificHeat: l.specificHeat
         })),
+        r_si: initialData.r_si ?? (getCategory(initialData.type) === "window" ? 0.13 : SURFACE_HEAT_RESISTANCE.R_SI.WALL),
+        r_se: initialData.r_se ?? (getExposure(initialData.type) === "direct" ? SURFACE_HEAT_RESISTANCE.R_SE.DIRECT : 0),
         absorptionCoefficient: initialData.absorptionCoefficient ?? 0.5,
+        isUValueManual: initialData.isUValueManual ?? false,
+        manualUValue: initialData.uValue ?? 0,
+        isShgcManual: initialData.isShgcManual ?? false,
+        manualShgc: initialData.shgc ?? 0,
     } : {
         id: uuidv4(),
         projectId,
@@ -173,6 +196,10 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
         r_se: SURFACE_HEAT_RESISTANCE.R_SE.DIRECT,
         frameId: "",
         absorptionCoefficient: 0.5,
+        isUValueManual: false,
+        manualUValue: 0,
+        isShgcManual: false,
+        manualShgc: 0,
     };
 
     const form = useForm<ConstructionFormValues>({
@@ -273,69 +300,122 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
         }
     };
 
-    // Calculate U-value on fly
-    const calculateUValue = () => {
-        // Standard Lookup for Window/Door
-        const frameId = form.getValues("frameId");
-        if (currentCategory === "window" || currentCategory === "door") {
-            const standardU = calculateStandardUValue(currentCategory, frameId, watchedLayers);
+    // Unified calculation function to ensure consistency between UI and Save
+    const getCalculatedResults = (type: SurfaceType, rsi: number, rse: number, fid: string | undefined, currentLayers: any[]) => {
+        const cat = getCategory(type);
+        const isWinOrDoor = cat === "window" || cat === "door";
+
+        let calcUValue = 0;
+        let calcThickness = 0;
+        let calcR = rsi + rse;
+        let isStd = false;
+
+        if (isWinOrDoor) {
+            const standardU = calculateStandardUValue(cat, fid, currentLayers);
             if (standardU !== null) {
-                // Calculate thickness for display
-                const totalThickness = watchedLayers.reduce((sum, l) => sum + (l.thickness || 0), 0);
-                return { uValue: standardU, totalThickness, totalR: standardU > 0 ? 1 / standardU : 0, isStandard: true };
+                calcUValue = standardU;
+                calcThickness = currentLayers.reduce((sum, l) => sum + (l.thickness || 0), 0);
+                calcR = standardU > 0 ? 1 / standardU : 0;
+                isStd = true;
             }
         }
 
-        let totalR = r_si + r_se;
-        let totalThickness = 0;
+        if (!isStd) {
+            calcThickness = 0;
+            currentLayers.forEach(layer => {
+                let k = 0;
+                if (layer.materialId === "custom") {
+                    k = layer.customThermalConductivity || 0;
+                } else if (layer.thermalConductivity !== undefined) {
+                    // Use hydrated value if available (for onSubmit)
+                    k = layer.thermalConductivity;
+                } else {
+                    const material = DEFAULT_MATERIALS.find(m => m.id === layer.materialId);
+                    k = material?.thermalConductivity || 0;
+                }
 
-        watchedLayers.forEach(layer => {
-            let k = 0;
-            if (layer.materialId === "custom") {
-                k = layer.customThermalConductivity || 0;
-            } else {
-                const material = DEFAULT_MATERIALS.find(m => m.id === layer.materialId);
-                k = material?.thermalConductivity || 0;
-            }
+                if (k > 0 && layer.thickness > 0) {
+                    calcR += layer.thickness / k;
+                    calcThickness += layer.thickness;
+                }
+            });
+            calcUValue = calcR > 0 ? 1 / calcR : 0;
+        }
 
-            if (k > 0 && layer.thickness > 0) {
-                totalR += layer.thickness / k;
-                totalThickness += layer.thickness;
-            }
-        });
+        const calcSHGC = isWinOrDoor ? calculateSHGC(currentLayers) : 0;
 
-        const uValue = totalR > 0 ? 1 / totalR : 0;
-        return { uValue, totalThickness, totalR, isStandard: false };
+        return { uValue: calcUValue, totalThickness: calcThickness, totalR: calcR, shgc: calcSHGC, isStandard: isStd };
     };
 
-    const { uValue, totalThickness, totalR, isStandard } = calculateUValue();
+    const { uValue, totalThickness, totalR, isStandard } = getCalculatedResults(currentType as SurfaceType, r_si, r_se, form.getValues("frameId"), watchedLayers);
+    const calculatedSHGC = (currentCategory === "window" || currentCategory === "door") ? getCalculatedResults(currentType as SurfaceType, r_si, r_se, form.getValues("frameId"), watchedLayers).shgc : 0;
+
+    // Sync manual values with calculated if not overridden
+    const isUValueManual = form.watch("isUValueManual");
+    const isShgcManual = form.watch("isShgcManual");
+
+    useEffect(() => {
+        if (!isUValueManual) {
+            form.setValue("manualUValue", parseFloat(uValue.toFixed(3)));
+        }
+    }, [uValue, isUValueManual, form]);
+
+    useEffect(() => {
+        if (!isShgcManual) {
+            form.setValue("manualShgc", parseFloat(calculatedSHGC.toFixed(3)));
+        }
+    }, [calculatedSHGC, isShgcManual, form]);
 
     const onSubmit = (data: ConstructionFormValues) => {
-        // Hydrate layers with material info for storage/display optimization if needed
-        // but core data is just IDs.
-        // We pass back the calculated U-value too
-        const hydratedLayers = data.layers.map(l => {
+        // Hydrate layers: only include proper Layer interface fields, NOT form-specific fields
+        const hydratedLayers: Layer[] = data.layers.map(l => {
             const mat = DEFAULT_MATERIALS.find(m => m.id === l.materialId);
+            const isCustom = l.materialId === "custom" || !mat;
+
             return {
-                ...l,
-                name: l.materialId === "custom" ? l.customName : mat?.name,
-                thermalConductivity: l.materialId === "custom" ? l.customThermalConductivity : mat?.thermalConductivity,
-                density: l.materialId === "custom" ? l.customDensity : mat?.density,
-                specificHeat: l.materialId === "custom" ? l.customSpecificHeat : mat?.specificHeat
+                id: l.id,
+                materialId: l.materialId,
+                thickness: l.thickness,
+                name: isCustom ? (l.customName || "Custom Layer") : mat!.name,
+                thermalConductivity: isCustom ? (l.customThermalConductivity || 0) : mat!.thermalConductivity,
+                density: isCustom ? (l.customDensity || 0) : mat!.density,
+                specificHeat: isCustom ? (l.customSpecificHeat || 0) : mat!.specificHeat,
             };
         });
 
-        const isWindowOrDoor = data.type === "window" || data.type === "door";
+        // Use the centralized calculation logic with the FINAL data and hydrated layers
+        const results = getCalculatedResults(
+            data.type as SurfaceType,
+            data.r_si,
+            data.r_se,
+            data.frameId,
+            hydratedLayers
+        );
 
+        const isWindowOrDoor = data.type === "window" || data.type === "door";
+        const finalUValue = data.isUValueManual ? data.manualUValue : parseFloat(results.uValue.toFixed(3));
+        const finalSHGC = isWindowOrDoor
+            ? (data.isShgcManual ? data.manualShgc : parseFloat(results.shgc.toFixed(3)))
+            : undefined;
+
+        // Explicitly construct Construction object — do NOT spread ...data to avoid leaking form-only fields
         const result: Construction = {
-            ...data,
+            id: data.id || initialData?.id || uuidv4(),
+            projectId: data.projectId || projectId,
+            name: data.name,
             type: data.type as SurfaceType,
-            uValue: parseFloat(uValue.toFixed(3)),
-            totalThickness: parseFloat(totalThickness.toFixed(3)),
-            shgc: isWindowOrDoor ? calculateSHGC(hydratedLayers as Layer[]) : undefined,
+            layers: hydratedLayers,
+            r_si: data.r_si,
+            r_se: data.r_se,
+            frameId: data.frameId,
+            uValue: finalUValue || 0,
+            totalThickness: parseFloat(results.totalThickness.toFixed(3)),
+            shgc: finalSHGC,
             absorptionCoefficient: !isWindowOrDoor ? data.absorptionCoefficient : undefined,
-            layers: hydratedLayers
+            isUValueManual: data.isUValueManual,
+            isShgcManual: data.isShgcManual,
         };
+
         onSave(result);
     };
 
@@ -403,10 +483,10 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                <SelectItem value="direct">직접 (Direct) (Fx=1.0)</SelectItem>
-                                <SelectItem value="indirect">간접 (Indirect) (Fx=0.5)</SelectItem>
+                                <SelectItem value="direct">직접 (Direct) (Fx={FX_DEFAULTS.DIRECT.toFixed(1)})</SelectItem>
+                                <SelectItem value="indirect">간접 (Indirect) (Fx={FX_DEFAULTS.INDIRECT.toFixed(1)})</SelectItem>
                                 {!['window', 'door'].includes(currentCategory) && (
-                                    <SelectItem value="ground">지면 (Ground) (Fx=0.6)</SelectItem>
+                                    <SelectItem value="ground">지면 (Ground) (Fx={FX_DEFAULTS.GROUND.toFixed(1)})</SelectItem>
                                 )}
                             </SelectContent>
                         </Select>
@@ -774,10 +854,31 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                         {/* Slot 1: SHGC (Window/Door) OR Total R (Others) */}
                         {(currentCategory === "window" || currentCategory === "door") ? (
                             <div>
-                                <div className="text-sm text-muted-foreground">일사취득 (SHGC)</div>
-                                <div className="text-xl font-mono text-blue-600">
-                                    {calculateSHGC(watchedLayers.map(l => ({ ...l, materialId: l.materialId || "" } as Layer))).toFixed(3)}
+                                <div className="flex items-center justify-center gap-2 mb-1">
+                                    <div className="text-sm text-muted-foreground">일사취득 (SHGC)</div>
+                                    <div className="flex items-center space-x-1">
+                                        <Checkbox
+                                            id="shgc-manual"
+                                            checked={isShgcManual}
+                                            onCheckedChange={(c) => form.setValue("isShgcManual", !!c)}
+                                            className="w-3 h-3"
+                                        />
+                                        <label htmlFor="shgc-manual" className="text-[10px] text-muted-foreground cursor-pointer select-none">수동</label>
+                                    </div>
                                 </div>
+                                {isShgcManual ? (
+                                    <div className="flex justify-center">
+                                        <Input
+                                            type="number" step="0.001"
+                                            {...form.register("manualShgc")}
+                                            className="w-24 text-center h-8"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="text-xl font-mono text-blue-600">
+                                        {calculatedSHGC.toFixed(3)}
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div>
@@ -794,11 +895,34 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
 
                         {/* Slot 3: U-Value */}
                         <div className="font-bold text-primary">
-                            <div className="text-sm text-muted-foreground">열관류율 (U-Value)</div>
-                            <div className="text-2xl font-mono flex items-center justify-center gap-2">
-                                {uValue.toFixed(3)} W/m²K
-                                {isStandard && <span className="text-xs font-normal px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">표준값</span>}
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                                <div className="text-sm text-muted-foreground">열관류율 (U-Value)</div>
+                                <div className="flex items-center space-x-1">
+                                    <Checkbox
+                                        id="u-value-manual"
+                                        checked={isUValueManual}
+                                        onCheckedChange={(c) => form.setValue("isUValueManual", !!c)}
+                                        className="w-3 h-3"
+                                    />
+                                    <label htmlFor="u-value-manual" className="text-[10px] text-muted-foreground cursor-pointer select-none">수동</label>
+                                </div>
                             </div>
+
+                            {isUValueManual ? (
+                                <div className="flex justify-center items-center gap-2">
+                                    <Input
+                                        type="number" step="0.001"
+                                        {...form.register("manualUValue")}
+                                        className="w-28 text-center h-9 text-lg font-mono"
+                                    />
+                                    <span className="text-sm text-muted-foreground">W/m²K</span>
+                                </div>
+                            ) : (
+                                <div className="text-2xl font-mono flex items-center justify-center gap-2">
+                                    {uValue.toFixed(3)} W/m²K
+                                    {isStandard && <span className="text-xs font-normal px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">표준값</span>}
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

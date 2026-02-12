@@ -3,7 +3,7 @@ import { ZoneInput } from "./types";
 import { DHWSystem } from "@/types/system";
 
 /**
- * 급탕 에너지 부하 계산 (DIN V 18599-8)
+ * 급탕 에너지 부하 계산 (DIN/TS 18599-8:2025-10)
  * 저장 손실(Q_W,s) 및 배관 손실(Q_W,d)을 포함합니다.
  */
 

@@ -29,12 +29,14 @@ export interface Project {
         systemType?: "balanced" | "exhaust"; // 신규: 열회수와 분리됨
         heatRecoveryEfficiency: number; // 0-100%
         infiltrationCategory?: "I" | "II" | "III" | "IV"; // DIN/TS 18599-2 표 6
-        hasALD?: boolean; // 공기 전달 장치 (Air Transfer Devices)
+        hasALD?: boolean; // 공기 전달 장치 (Air Transfer Devices) - ATD
         n50: number; // 계산된 표준 n50 값 (또는 조회값)
         isMeasured?: boolean; // true일 경우, n50을 수동으로 입력함
+        dailyOperationHours?: number; // t_v,mech: 기계환기 일일 운전시간 (기본 24h)
     };
     ventilationUnits?: VentilationUnit[];
     automationConfig?: BuildingAutomationConfig; // DIN 18599-11
+    simulationMethod?: "monthly" | "hourly"; // "monthly": DIN 18599 Normal, "hourly": 5R1C (ISO 13790)
     systems?: BuildingSystem[]; // Centralized list of all technical systems
 }
 
@@ -43,6 +45,7 @@ import { BuildingSystem } from "./system";
 export interface BuildingAutomationConfig {
     automationClass: "A" | "B" | "C" | "D"; // A: High performance, D: Non-energy efficient
     heatingControl: "manual" | "thermostatic" | "electronic_pi" | "bacs_ref";
+    heatingTempControl?: "fixed" | "auto_adapt"; // New: Temperature setpoint control strategy
     coolingControl?: "manual" | "thermostatic" | "electronic_pi" | "bacs_ref";
     ventilationControl?: "manual" | "time_scheduled" | "demand_controlled";
 }
@@ -59,15 +62,16 @@ export interface VentilationUnit {
 }
 
 export type ZoneUsageType =
-    | "1_office" | "2_open_plan" | "3_meeting" | "4_library" | "5_retail"
-    | "6_retail_large" | "7_classroom" | "8_lecture_hall" | "9_bed_room" | "10_hotel_room"
-    | "11_canteen" | "12_restaurant" | "13_kitchen" | "14_storage_heated" | "15_storage_unheated"
-    | "16_parking" | "17_workshop_light" | "17_1_workshop_medium" | "18_workshop_heavy" | "19_gym"
-    | "20_fitness" | "21_pool" | "22_lab" | "23_exam_room" | "24_icu" | "25_corridor_care"
-    | "26_medical_practice" | "27_exhibition" | "28_trade_fair"
-    | "33_foyer" | "34_retail_refrig" | "35_kitchen_high" | "36_hotel_wellness"
-    | "38_server" | "39_datacenter" | "41_logistics"
-    | "42_res_single" | "43_res_multi" | "44_dorm";
+    | "1_office" | "2_group_office" | "3_open_plan" | "4_meeting" | "5_counter_hall"
+    | "6_retail" | "7_retail_refrig" | "8_classroom" | "9_lecture_hall" | "10_bed_room"
+    | "11_hotel_room" | "12_canteen" | "13_restaurant" | "14_kitchen" | "15_kitchen_prep"
+    | "16_wc" | "17_other_rooms" | "18_ancillary" | "19_traffic" | "20_storage_tech"
+    | "21_datacenter" | "22_workshop_heavy" | "23_workshop_medium" | "24_workshop_light"
+    | "25_auditorium_theater" | "26_foyer_theater" | "27_stage_theater" | "28_trade_fair"
+    | "29_museum" | "30_library_reading" | "31_library_open" | "32_library_storage"
+    | "33_gym" | "34_parking_office" | "35_parking_public" | "36_sauna" | "37_fitness"
+    | "38_lab" | "39_exam_room" | "40_special_care" | "41_logistics" | "42_res_single"
+    | "43_res_multi" | "44_dorm";
 
 export interface Zone {
     id?: string;
@@ -81,7 +85,7 @@ export interface Zone {
         heating: number; // °C
         cooling: number; // °C
     };
-    thermalBridgeMode?: number; // 0.05, 0.10, or 0.15
+    thermalBridgeMode?: number; // Delta_U_WB [W/(m²K)]: 0.05, 0.10 (Default), 0.15, or 0.03 (Cat B)
     lighting?: {
         powerDensity?: number; // W/m² (Optional override)
         efficacy?: number; // lm/W (Optional override, default ~60)
@@ -92,7 +96,10 @@ export interface Zone {
     linkedVentilationUnitIds?: string[]; // Reference to multiple VentilationUnits
     ventilationMode?: "natural" | "mechanical" | "balanced_mech"; // Explicit mode per zone
     thermalCapacitySpecific?: number; // Wh/(m²·K) - Specific Thermal Capacity
-    heatingReducedMode?: "setback" | "shutdown"; // Night/Weekend operation mode
+    heatingReducedMode?: "setback" | "shutdown"; // 야간/주말 운전 모드 (저감/정지)
+    isPartialHeating?: boolean; // 6.1.2.4 공간적 부분 난방 (Teilbeheizung)
+    partiallyHeatedAreaRatio?: number; // a_tb: 부분 난방 면적 비율 (0.0 - 1.0)
+    partialHeatingLoadMax?: number; // Phi_h_max: 최대 난방 부하 밀도 (W/m², 선택 사항)
 
     // Geometry Visualization Properties (Removed)
     // coordinates/dimensions removed as per request
@@ -122,17 +129,16 @@ export interface Surface {
     area: number; // m²
     uValue: number; // W/(m²K)
     orientation?: Orientation;
-    tilt?: number; // 각도 (0 = 수평, 90 = 수직)
-    reductionFactor?: number; // 차양 등을 위한 fx 값
+    tilt?: number; // Tilt angle (90=vertical, 0=horizontal)
+
+    // 6.2.2 Transmission to Unheated Space
+    fx?: number; // Temperature Correction Factor (F_x), DIN V 18599-2. Default: 1.0 (outdoor) or 0.5 (unheated)
+
+    // 6.2.3 Transmission to Adjacent Zone
+    adjacentZoneId?: string; // ID of adjacent zone (if applicable)
     windowArea?: number; // 벽체에 포함된 창호 면적 (약식 계산용)
     absorptionCoefficient?: number; // alpha (0.0 - 1.0), 불투명체 기본값 0.5
     shgc?: number; // 태양열 취득 계수 (창호/문 전용, Envelope Type에서 가져옴)
-    shading?: {
-        hasDevice: boolean;
-        type?: "internal" | "external" | "intermediate"; // 차양 장치 위치
-        fcValue: number; // 태양열 취득 감소 계수 (Reduction Factor, 0.0 - 1.0)
-        operationMode?: "manual" | "automatic" | "fixed";
-    };
     constructionId?: string; // 구조체(Construction) 참조
     orderIndex?: number;
 }
@@ -177,5 +183,10 @@ export interface Construction {
     shgc?: number; // 태양열 취득 계수 (창호/문 전용)
     absorptionCoefficient?: number; // 태양 복사 흡수율 (불투명 외피 전용)
     totalThickness: number; // m
+
+    // Override Flags
+    isUValueManual?: boolean;
+    isShgcManual?: boolean;
+
     orderIndex?: number; // 드래그 앤 드롭 정렬용
 }

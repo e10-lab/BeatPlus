@@ -1,4 +1,4 @@
-import { Zone, Surface } from "@/types/project";
+import { Zone, Surface, SurfaceType } from "@/types/project";
 import { EnergyCarrier } from "@/types/system";
 
 export interface ProjectStats {
@@ -36,6 +36,62 @@ export const CO2_FACTORS: Record<EnergyCarrier, number> = {
 };
 
 /**
+ * 기본 온도 보정 계수 (Default Temperature Correction Factors, Fx)
+ * DIN/TS 18599-2:2025-10 기반
+ */
+export const FX_DEFAULTS = {
+    DIRECT: 1.0,    // 외기 직접 면함
+    INDIRECT: 0.5,  // 비난방 공간 또는 인접 존 간접 면함
+    GROUND: 0.6     // 지면 접함 (DIN 18599-2 표 3 참조, 바닥은 0.6, 벽은 0.5~0.6)
+};
+
+/**
+ * 표면 노출 유형 (Exposure Category)
+ * - DIRECT_EXTERIOR: 외기에 직접 면함 (b = 1.0)
+ * - INDIRECT_EXTERIOR: 비난방 공간 등에 면함 (b < 1.0)
+ * - GROUND_EXTERIOR: 지면에 접함 (b < 1.0)
+ * - INTERIOR: 난방 공간 간 접함 (단열적 가정, b = 0)
+ */
+export enum ExposureCategory {
+    DIRECT_EXTERIOR = "DIRECT_EXTERIOR",
+    INDIRECT_EXTERIOR = "INDIRECT_EXTERIOR",
+    GROUND_EXTERIOR = "GROUND_EXTERIOR",
+    INTERIOR = "INTERIOR"
+}
+
+/**
+ * 표면의 Fx 값과 타입 정보를 바탕으로 노출 유형을 결정합니다.
+ */
+export function getExposureCategory(surface: Surface): ExposureCategory {
+    // 1. Fx 값이 명시적으로 있거나, 없으면 기본값 조회
+    const fx = surface.fx !== undefined ? surface.fx : getFxDefault(surface.type);
+
+    // 2. Fx 값에 따른 1차 분류
+    if (fx >= 0.9) return ExposureCategory.DIRECT_EXTERIOR; // 1.0
+    if (fx === 0.0) return ExposureCategory.INTERIOR;       // 0.0 (Adiabatic/Interior)
+
+    // 3. Fx가 0 < fx < 0.9 인 경우 (Ground or Indirect)
+    if (surface.type.includes("ground") || surface.type.includes("floor")) {
+        // 바닥이면서 fx < 0.9 이면 Ground로 간주 (표준값 0.6)
+        return ExposureCategory.GROUND_EXTERIOR;
+    }
+
+    // 그 외 (벽체인데 0.5 등) -> Indirect Exterior
+    return ExposureCategory.INDIRECT_EXTERIOR;
+}
+
+/**
+ * 표면 유형에 따른 기본 Fx 값을 반환합니다.
+ */
+export function getFxDefault(type: SurfaceType): number {
+    if (type.includes("exterior")) return FX_DEFAULTS.DIRECT;
+    if (type.includes("ground")) return FX_DEFAULTS.GROUND;
+    if (type.includes("interior")) return FX_DEFAULTS.INDIRECT;
+    if (type === "window" || type === "door") return FX_DEFAULTS.DIRECT;
+    return FX_DEFAULTS.DIRECT;
+}
+
+/**
  * 존(Zones)과 표면(Surfaces) 데이터를 집계하여 건축물 총 부피 및 외피 면적을 계산합니다.
  */
 export function calculateProjectStats(zones: Zone[], allSurfaces: Surface[]): ProjectStats {
@@ -51,49 +107,54 @@ export function calculateProjectStats(zones: Zone[], allSurfaces: Surface[]): Pr
 
     allSurfaces.forEach(surface => {
         if (surface.zoneId && excludedZoneIds.has(surface.zoneId)) return;
-        totalEnvelopeArea += surface.area;
+
+        const category = getExposureCategory(surface);
+        const isEnvelope = category !== ExposureCategory.INTERIOR;
+
+        if (isEnvelope) {
+            totalEnvelopeArea += surface.area;
+        }
     });
 
     return { totalVolume, totalEnvelopeArea };
 }
 
+export type AirTightnessCategory = "I" | "II" | "III" | "IV";
+
 /**
- * 환기 방식 및 건물 부피에 따른 표준 기밀 성능(n50, 침기율) 값을 계산합니다.
- * DIN/TS 18599-2:2025-10 표 6 기준을 적용합니다.
+ * DIN/TS 18599-2:2025-10 표 8 - 기밀성 등급별 기본 n50 값
  */
+export const N50_TABLE: Record<AirTightnessCategory, { n50: number, q50: number, n50_no_mech?: number, q50_no_mech?: number }> = {
+    "I": { n50: 1.0, q50: 2.0, n50_no_mech: 2.0, q50_no_mech: 3.0 },
+    "II": { n50: 4.0, q50: 6.0 },
+    "III": { n50: 6.0, q50: 9.0 },
+    "IV": { n50: 10.0, q50: 15.0 }
+};
+
 export function calculateStandardN50(
     totalVolume: number,
     totalEnvelopeArea: number,
     ventilationType: "natural" | "mechanical",
-    category: "I" | "II" | "III" | "IV" = "I"
+    category: AirTightnessCategory = "II"
 ): number {
     if (totalVolume <= 0) return 2.0;
 
-    const table6 = {
-        "I": {
-            small: { natural: 3.0, mechanical: 1.5 },
-            large: { natural: 3.0, mechanical: 2.0 }  // q50 기준
-        },
-        "II": {
-            small: { natural: 4.5, mechanical: 3.0 },
-            large: { natural: 6.0, mechanical: 3.0 }  // q50 기준
-        },
-        "III": {
-            small: 6.0,
-            large: 9.0
-        },
-        "IV": {
-            small: 10.0,
-            large: 15.0
-        }
-    };
+    const entry = N50_TABLE[category];
+    const hasMech = ventilationType === "mechanical";
+
+    let n50_base = entry.n50;
+    let q50_base = entry.q50;
+
+    // Category I special case
+    if (category === "I" && !hasMech) {
+        n50_base = entry.n50_no_mech ?? n50_base;
+        q50_base = entry.q50_no_mech ?? q50_base;
+    }
 
     if (totalVolume <= 1500) {
-        const val = table6[category].small;
-        return typeof val === "number" ? val : val[ventilationType];
+        return n50_base;
     } else {
-        const q50Val = table6[category].large;
-        const q50 = typeof q50Val === "number" ? q50Val : q50Val[ventilationType];
-        return q50 * (totalEnvelopeArea / totalVolume);
+        // Equation 70: n50 = q50 * (A_E / V)
+        return q50_base * (totalEnvelopeArea / totalVolume);
     }
 }

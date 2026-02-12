@@ -259,89 +259,7 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
         }
     };
 
-    if (viewMode === "form") {
-        return (
-            <div className="space-y-6 max-w-3xl mx-auto">
-                <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className="mb-2">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> 존 목록으로 돌아가기
-                </Button>
 
-                <div className="bg-card border rounded-lg p-6 shadow-sm">
-                    <h2 className="text-xl font-semibold mb-4">
-                        {selectedZone ? "존 수정" : "새로운 존 추가"}
-                    </h2>
-
-                    <ZoneForm
-                        projectId={projectId}
-                        zone={selectedZone}
-                        onSuccess={handleFormSuccess}
-                        onCancel={handleFormCancel}
-                        projectStats={projectStats}
-                        projectVentilation={project?.ventilationConfig}
-                        units={project?.ventilationUnits}
-                        systems={project?.systems}
-                        renderEnvelope={() => (
-                            selectedZone && selectedZone.id ? (
-                                <EnvelopeSection
-                                    selectedZone={selectedZone}
-                                    projectId={projectId}
-                                    handleAddSurface={handleAddSurface}
-                                    handleEditSurface={handleEditSurface}
-                                    refreshTrigger={refreshTrigger}
-                                    constructions={constructions}
-                                    setSelectedZone={setSelectedZone}
-                                    handleFormSuccess={handleFormSuccess}
-                                />
-                            ) : null
-                        )}
-                    />
-                </div >
-            </div>
-        );
-    }
-
-    if (viewMode === "system-form") {
-        return (
-            <div className="space-y-6 max-w-3xl mx-auto">
-                <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className="mb-2">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> 시스템 목록으로 돌아가기
-                </Button>
-                <SystemForm
-                    projectId={projectId}
-                    system={selectedSystem}
-                    zones={zones}
-                    onSave={handleSystemSave}
-                    onCancel={() => setViewMode("list")}
-                />
-            </div>
-        );
-    }
-
-    if (viewMode === "surface-form" && selectedZone) {
-        return (
-            <div className="space-y-4 max-w-3xl mx-auto">
-                <Button variant="ghost" size="sm" onClick={() => setViewMode("form")} className="mb-2">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> {selectedZone!.name} 수정으로 돌아가기
-                </Button>
-                <div className="bg-card border rounded-lg p-6 shadow-sm">
-                    <h2 className="text-xl font-semibold mb-1">
-                        {selectedSurface ? "표면 수정" : "새로운 표면 추가"}
-                    </h2>
-                    <p className="text-sm text-muted-foreground mb-6">
-                        {selectedZone!.name}에 속한 표면 정보를 입력하세요.
-                    </p>
-                    <SurfaceForm
-                        projectId={projectId}
-                        zoneId={selectedZone!.id!}
-                        surface={selectedSurface}
-                        onSuccess={handleSurfaceFormSuccess}
-                        onCancel={handleSurfaceFormCancel}
-                        constructions={constructions}
-                    />
-                </div>
-            </div>
-        );
-    }
 
     return (
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
@@ -352,192 +270,256 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
             </TabsList>
 
             <TabsContent value="zones" className="space-y-4">
-                {/* Project Ventilation Settings Card */}
-                {project && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>외피 기밀성 및 침기 설정 (Air Tightness & Infiltration)</CardTitle>
-                            <CardDescription>
-                                건물 전체의 기밀 등급과 침기율(n50)을 설정합니다. 기계 환기 설비가 있는 경우 더 엄격한 기밀성이 요구됩니다.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                                {/* Col 1: Category */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <Label>기밀 등급 (Category)</Label>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>I: 기밀성 검증 완료</p>
-                                                    <p>II: 신축 건물 (표준)</p>
-                                                    <p>III: 기존 건물</p>
-                                                    <p>IV: 노후 건물</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
-                                    <Select
-                                        value={project.ventilationConfig?.infiltrationCategory || "I"}
-                                        onValueChange={(val: "I" | "II" | "III" | "IV") => {
-                                            // Determine mode based on AHU system presence
-                                            const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
-                                            const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
+                {(viewMode === "form" || viewMode === "surface-form") ? (
+                    viewMode === "surface-form" && selectedZone ? (
+                        <div className="space-y-4 max-w-3xl mx-auto">
+                            <Button variant="ghost" size="sm" onClick={() => setViewMode("form")} className="mb-2">
+                                <ArrowLeft className="mr-2 h-4 w-4" /> {selectedZone!.name} 수정으로 돌아가기
+                            </Button>
+                            <div className="bg-card border rounded-lg p-6 shadow-sm">
+                                <h2 className="text-xl font-semibold mb-1">
+                                    {selectedSurface ? "표면 수정" : "새로운 표면 추가"}
+                                </h2>
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    {selectedZone!.name}에 속한 표면 정보를 입력하세요.
+                                </p>
+                                <SurfaceForm
+                                    projectId={projectId}
+                                    zoneId={selectedZone!.id!}
+                                    surface={selectedSurface}
+                                    onSuccess={handleSurfaceFormSuccess}
+                                    onCancel={handleSurfaceFormCancel}
+                                    constructions={constructions}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-6 max-w-3xl mx-auto">
+                            <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className="mb-2">
+                                <ArrowLeft className="mr-2 h-4 w-4" /> 존 목록으로 돌아가기
+                            </Button>
 
-                                            const newN50 = project.ventilationConfig?.isMeasured
-                                                ? project.ventilationConfig.n50
-                                                : calculateStandardN50(
-                                                    projectStats.totalVolume,
-                                                    projectStats.totalEnvelopeArea,
-                                                    mode,
-                                                    val
-                                                );
+                            <div className="bg-card border rounded-lg p-6 shadow-sm">
+                                <h2 className="text-xl font-semibold mb-4">
+                                    {selectedZone ? "존 수정" : "새로운 존 추가"}
+                                </h2>
 
-                                            const newConfig = {
-                                                ...project.ventilationConfig!,
-                                                infiltrationCategory: val,
-                                                type: mode, // Update mode as well
-                                                n50: newN50
-                                            };
-                                            updateProjectVentilation(projectId, newConfig).then(() => {
-                                                loadProjectStats();
-                                            });
-                                        }}
-                                    >
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="I">Category I (검증됨)</SelectItem>
-                                            <SelectItem value="II">Category II (신축)</SelectItem>
-                                            <SelectItem value="III">Category III (기존)</SelectItem>
-                                            <SelectItem value="IV">Category IV (노후)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Col 2: n50 Result */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <Label>적용 침기율 (n50)</Label>
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id="n50-measured"
-                                                checked={project.ventilationConfig?.isMeasured || false}
-                                                onCheckedChange={(checked) => {
-                                                    const isMeasured = checked === true;
+                                <ZoneForm
+                                    projectId={projectId}
+                                    zone={selectedZone}
+                                    onSuccess={handleFormSuccess}
+                                    onCancel={handleFormCancel}
+                                    projectStats={projectStats}
+                                    projectVentilation={project?.ventilationConfig}
+                                    units={project?.ventilationUnits}
+                                    systems={project?.systems}
+                                    renderEnvelope={() => (
+                                        selectedZone && selectedZone.id ? (
+                                            <EnvelopeSection
+                                                selectedZone={selectedZone}
+                                                projectId={projectId}
+                                                handleAddSurface={handleAddSurface}
+                                                handleEditSurface={handleEditSurface}
+                                                refreshTrigger={refreshTrigger}
+                                                constructions={constructions}
+                                                setSelectedZone={setSelectedZone}
+                                                handleFormSuccess={handleFormSuccess}
+                                            />
+                                        ) : null
+                                    )}
+                                />
+                            </div >
+                        </div>
+                    )
+                ) : (
+                    <>
+                        {/* Project Ventilation Settings Card */}
+                        {project && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>외피 기밀성 및 침기 설정 (Air Tightness & Infiltration)</CardTitle>
+                                    <CardDescription>
+                                        건물 전체의 기밀 등급과 침기율(n50)을 설정합니다. 기계 환기 설비가 있는 경우 더 엄격한 기밀성이 요구됩니다.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                                        {/* Col 1: Category */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <Label>기밀 등급 (Category)</Label>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>I: 기밀성 검증 완료</p>
+                                                            <p>II: 신축 건물 (표준)</p>
+                                                            <p>III: 기존 건물</p>
+                                                            <p>IV: 노후 건물</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                            <Select
+                                                value={project.ventilationConfig?.infiltrationCategory || "I"}
+                                                onValueChange={(val: "I" | "II" | "III" | "IV") => {
                                                     // Determine mode based on AHU system presence
                                                     const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
                                                     const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
 
-                                                    const cat = project.ventilationConfig?.infiltrationCategory || "I";
-
-                                                    const n50 = isMeasured
-                                                        ? (project.ventilationConfig?.n50 || 2.0)
-                                                        : calculateStandardN50(projectStats.totalVolume, projectStats.totalEnvelopeArea, mode, cat);
+                                                    const newN50 = project.ventilationConfig?.isMeasured
+                                                        ? project.ventilationConfig.n50
+                                                        : calculateStandardN50(
+                                                            projectStats.totalVolume,
+                                                            projectStats.totalEnvelopeArea,
+                                                            mode,
+                                                            val
+                                                        );
 
                                                     const newConfig = {
                                                         ...project.ventilationConfig!,
-                                                        n50: n50,
-                                                        isMeasured: isMeasured,
-                                                        type: mode
+                                                        infiltrationCategory: val,
+                                                        type: mode, // Update mode as well
+                                                        n50: newN50
                                                     };
-
                                                     updateProjectVentilation(projectId, newConfig).then(() => {
                                                         loadProjectStats();
                                                     });
                                                 }}
-                                            />
-                                            <label
-                                                htmlFor="n50-measured"
-                                                className="text-xs text-muted-foreground font-medium leading-none cursor-pointer"
                                             >
-                                                직접 입력
-                                            </label>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="I">Category I (검증됨)</SelectItem>
+                                                    <SelectItem value="II">Category II (신축)</SelectItem>
+                                                    <SelectItem value="III">Category III (기존)</SelectItem>
+                                                    <SelectItem value="IV">Category IV (노후)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {/* Col 2: n50 Result */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label>적용 침기율 (n50)</Label>
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id="n50-measured"
+                                                        checked={project.ventilationConfig?.isMeasured || false}
+                                                        onCheckedChange={(checked) => {
+                                                            const isMeasured = checked === true;
+                                                            // Determine mode based on AHU system presence
+                                                            const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
+                                                            const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
+
+                                                            const cat = project.ventilationConfig?.infiltrationCategory || "I";
+
+                                                            const n50 = isMeasured
+                                                                ? (project.ventilationConfig?.n50 || 2.0)
+                                                                : calculateStandardN50(projectStats.totalVolume, projectStats.totalEnvelopeArea, mode, cat);
+
+                                                            const newConfig = {
+                                                                ...project.ventilationConfig!,
+                                                                n50: n50,
+                                                                isMeasured: isMeasured,
+                                                                type: mode
+                                                            };
+
+                                                            updateProjectVentilation(projectId, newConfig).then(() => {
+                                                                loadProjectStats();
+                                                            });
+                                                        }}
+                                                    />
+                                                    <label
+                                                        htmlFor="n50-measured"
+                                                        className="text-xs text-muted-foreground font-medium leading-none cursor-pointer"
+                                                    >
+                                                        직접 입력
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            {project.ventilationConfig?.isMeasured ? (
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={project.ventilationConfig?.n50 || 0}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        if (project) setProject({ ...project, ventilationConfig: { ...project.ventilationConfig!, n50: val } });
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        const newConfig = { ...project.ventilationConfig!, n50: val, isMeasured: true };
+                                                        updateProjectVentilation(projectId, newConfig).then(() => loadProjectStats());
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center p-2 bg-muted rounded-md border font-mono text-lg font-medium h-10">
+                                                    {(project.ventilationConfig?.n50 || 0).toFixed(2)} <span className="ml-1 text-sm text-muted-foreground">h⁻¹</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Col 3: ALD (Automatic for Mechanical, Manual for Natural) */}
+                                        <div className="space-y-4 pt-8">
+                                            <div className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id="has-ald"
+                                                    checked={project.ventilationConfig?.hasALD || false}
+                                                    disabled={project.ventilationConfig?.type === "mechanical"}
+                                                    onCheckedChange={(checked) => {
+                                                        const newConfig = {
+                                                            ...project.ventilationConfig!,
+                                                            hasALD: checked === true
+                                                        };
+                                                        updateProjectVentilation(projectId, newConfig);
+                                                    }}
+                                                />
+                                                <label
+                                                    htmlFor="has-ald"
+                                                    className="text-sm font-medium leading-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+                                                >
+                                                    외부 공기 유입구 (ALD)
+                                                </label>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                {project.ventilationConfig?.type === "mechanical"
+                                                    ? "기계 환기 시 시스템 구성에 따라 자동 결정됩니다. (배기 전용: 켜짐, 급/배기: 꺼짐)"
+                                                    : "침기율 계산 시 ALD의 영향(f_ATD)을 고려합니다."}
+                                            </p>
                                         </div>
                                     </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
-                                    {project.ventilationConfig?.isMeasured ? (
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            value={project.ventilationConfig?.n50 || 0}
-                                            onChange={(e) => {
-                                                const val = parseFloat(e.target.value) || 0;
-                                                if (project) setProject({ ...project, ventilationConfig: { ...project.ventilationConfig!, n50: val } });
-                                            }}
-                                            onBlur={(e) => {
-                                                const val = parseFloat(e.target.value) || 0;
-                                                const newConfig = { ...project.ventilationConfig!, n50: val, isMeasured: true };
-                                                updateProjectVentilation(projectId, newConfig).then(() => loadProjectStats());
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="flex items-center justify-center p-2 bg-muted rounded-md border font-mono text-lg font-medium h-10">
-                                            {(project.ventilationConfig?.n50 || 0).toFixed(2)} <span className="ml-1 text-sm text-muted-foreground">h⁻¹</span>
-                                        </div>
-                                    )}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+                                <div className="space-y-1.5">
+                                    <CardTitle>건물 형상 (Geometry)</CardTitle>
+                                    <CardDescription>
+                                        건물의 존(Zone)과 외피(Surface) 정보를 관리합니다.
+                                    </CardDescription>
                                 </div>
-
-                                {/* Col 3: ALD (Automatic for Mechanical, Manual for Natural) */}
-                                <div className="space-y-4 pt-8">
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id="has-ald"
-                                            checked={project.ventilationConfig?.hasALD || false}
-                                            disabled={project.ventilationConfig?.type === "mechanical"}
-                                            onCheckedChange={(checked) => {
-                                                const newConfig = {
-                                                    ...project.ventilationConfig!,
-                                                    hasALD: checked === true
-                                                };
-                                                updateProjectVentilation(projectId, newConfig);
-                                            }}
-                                        />
-                                        <label
-                                            htmlFor="has-ald"
-                                            className="text-sm font-medium leading-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
-                                        >
-                                            외부 공기 유입구 (ALD)
-                                        </label>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        {project.ventilationConfig?.type === "mechanical"
-                                            ? "기계 환기 시 시스템 구성에 따라 자동 결정됩니다. (배기 전용: 켜짐, 급/배기: 꺼짐)"
-                                            : "침기율 계산 시 ALD의 영향(f_ATD)을 고려합니다."}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                <Button onClick={handleAddZone}>
+                                    <Plus className="mr-2 h-4 w-4" /> 존 추가
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <ZoneList
+                                    projectId={projectId}
+                                    onEdit={handleEditZone}
+                                    onViewDetail={handleOpenZone}
+                                    refreshTrigger={refreshTrigger}
+                                    onZoneChange={loadProjectStats}
+                                    availableUnits={project?.ventilationUnits}
+                                />
+                            </CardContent>
+                        </Card>
+                    </>
                 )}
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-                        <div className="space-y-1.5">
-                            <CardTitle>건물 형상 (Geometry)</CardTitle>
-                            <CardDescription>
-                                건물의 존(Zone)과 외피(Surface) 정보를 관리합니다.
-                            </CardDescription>
-                        </div>
-                        <Button onClick={handleAddZone}>
-                            <Plus className="mr-2 h-4 w-4" /> 존 추가
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <ZoneList
-                            projectId={projectId}
-                            onEdit={handleEditZone}
-                            onViewDetail={handleOpenZone}
-                            refreshTrigger={refreshTrigger}
-                            onZoneChange={loadProjectStats}
-                            availableUnits={project?.ventilationUnits}
-                        />
-                    </CardContent>
-                </Card>
-
             </TabsContent>
 
             <TabsContent value="constructions">
@@ -552,100 +534,100 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                         <ConstructionManager
                             constructions={constructions}
                             projectId={projectId}
-                            onUpdate={loadConstructions}
+                            onUpdate={() => {
+                                loadConstructions();
+                                setRefreshTrigger((prev) => prev + 1);
+                            }}
                         />
                     </CardContent>
                 </Card>
             </TabsContent>
 
             <TabsContent value="systems">
-                {/* Thermal Systems */}
-                <Card className="mb-6">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div className="space-y-1.5">
-                            <CardTitle>열원 및 설비 시스템 (Thermal Systems)</CardTitle>
-                            <CardDescription>
-                                난방, 냉방, 급탕(DHW) 및 태양광 시스템을 정의하고 존과 연결합니다.
-                            </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2 bg-muted p-1 rounded-md">
-                            <Button
-                                variant={!isSystemGraphMode ? "secondary" : "ghost"}
-                                size="sm"
-                                className="h-8 px-2"
-                                onClick={() => setIsSystemGraphMode(false)}
-                            >
-                                <LayoutList className="h-4 w-4 mr-1" /> 목록
-                            </Button>
-                            <Button
-                                variant={isSystemGraphMode ? "secondary" : "ghost"}
-                                size="sm"
-                                className="h-8 px-2"
-                                onClick={() => setIsSystemGraphMode(true)}
-                            >
-                                <Network className="h-4 w-4 mr-1" /> 다이어그램
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {isSystemGraphMode ? (
-                            <SystemGraphView
-                                systems={project?.systems || []}
-                                zones={zones}
-                            />
-                        ) : (
-                            <SystemList
-                                projectId={projectId}
-                                systems={project?.systems || []}
-                                onAdd={handleAddSystem}
-                                onEdit={handleEditSystem}
-                                onDelete={handleDeleteSystemClick}
-                            />
-                        )}
-                    </CardContent>
-                </Card>
+                {viewMode === "system-form" ? (
+                    <div className="space-y-6 max-w-3xl mx-auto">
+                        <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className="mb-2">
+                            <ArrowLeft className="mr-2 h-4 w-4" /> 시스템 목록으로 돌아가기
+                        </Button>
+                        <SystemForm
+                            projectId={projectId}
+                            system={selectedSystem}
+                            zones={zones}
+                            onSave={handleSystemSave}
+                            onCancel={() => setViewMode("list")}
+                        />
+                    </div>
+                ) : (
+                    <>
+                        {/* Thermal Systems */}
+                        <Card className="mb-6">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div className="space-y-1.5">
+                                    <CardTitle>열원 및 설비 시스템 (Thermal Systems)</CardTitle>
+                                    <CardDescription>
+                                        난방, 냉방, 급탕(DHW) 및 태양광 시스템을 정의하고 존과 연결합니다.
+                                    </CardDescription>
+                                </div>
+                                <div className="flex items-center gap-2 bg-muted p-1 rounded-md">
+                                    <Button
+                                        variant={!isSystemGraphMode ? "secondary" : "ghost"}
+                                        size="sm"
+                                        className="h-8 px-2"
+                                        onClick={() => setIsSystemGraphMode(false)}
+                                    >
+                                        <LayoutList className="h-4 w-4 mr-1" /> 목록
+                                    </Button>
+                                    <Button
+                                        variant={isSystemGraphMode ? "secondary" : "ghost"}
+                                        size="sm"
+                                        className="h-8 px-2"
+                                        onClick={() => setIsSystemGraphMode(true)}
+                                    >
+                                        <Network className="h-4 w-4 mr-1" /> 다이어그램
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {isSystemGraphMode ? (
+                                    <SystemGraphView
+                                        systems={project?.systems || []}
+                                        zones={zones}
+                                    />
+                                ) : (
+                                    <SystemList
+                                        projectId={projectId}
+                                        systems={project?.systems || []}
+                                        onAdd={handleAddSystem}
+                                        onEdit={handleEditSystem}
+                                        onDelete={handleDeleteSystemClick}
+                                    />
+                                )}
+                            </CardContent>
+                        </Card>
 
-                <Dialog open={deleteSystemConfirmOpen} onOpenChange={setDeleteSystemConfirmOpen}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>설비 삭제 확인</DialogTitle>
-                            <DialogDescription>
-                                정말로 &apos;{systemToDelete?.name}&apos; 설비를 삭제하시겠습니까?
-                                이 작업은 되돌릴 수 없으며 존에 연결된 설비 정보가 해제됩니다.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter className="gap-2 sm:gap-0">
-                            <Button variant="outline" onClick={() => setDeleteSystemConfirmOpen(false)}>
-                                취소
-                            </Button>
-                            <Button variant="destructive" onClick={confirmDeleteSystem}>
-                                삭제
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Mechanical Ventilation - Deprecated in favor of AHU Systems */}
-                {/* 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>기계 환기 장비 (Ventilation Units)</CardTitle>
-                        <CardDescription>
-                            공조기(AHU), 전열교환기(ERV) 등 주요 기계 환기 장비를 정의합니다.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {project && (
-                            <VentilationUnitManager
-                                projectId={projectId}
-                                units={project.ventilationUnits || []}
-                                onUpdate={loadProjectStats} // Re-fetch project to update list
-                            />
-                        )}
-                    </CardContent>
-                </Card> 
-                */}
+                        <Dialog open={deleteSystemConfirmOpen} onOpenChange={setDeleteSystemConfirmOpen}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>설비 삭제 확인</DialogTitle>
+                                    <DialogDescription>
+                                        정말로 &apos;{systemToDelete?.name}&apos; 설비를 삭제하시겠습니까?
+                                        이 작업은 되돌릴 수 없으며 존에 연결된 설비 정보가 해제됩니다.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter className="gap-2 sm:gap-0">
+                                    <Button variant="outline" onClick={() => setDeleteSystemConfirmOpen(false)}>
+                                        취소
+                                    </Button>
+                                    <Button variant="destructive" onClick={confirmDeleteSystem}>
+                                        삭제
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </>
+                )}
             </TabsContent>
+
         </Tabs >
     );
 }

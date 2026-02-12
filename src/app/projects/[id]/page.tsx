@@ -14,7 +14,6 @@ import { ArrowLeft, Building2, MapPin, CalendarDays, Loader2 } from "lucide-reac
 import { Badge } from "@/components/ui/badge";
 import { ProjectSettingsForm } from "@/features/input/components/project-settings-form";
 import { ClimateView } from "@/features/results/components/climate-view";
-import { ThreeDView } from "@/features/input/components/three-d-view";
 
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,10 +105,10 @@ export default function ProjectDetailsPage() {
 
             {/* Main Content Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 lg:w-[675px]">
+                <TabsList className="grid w-full grid-cols-4 lg:w-[540px]">
                     <TabsTrigger value="overview">개요 (Overview)</TabsTrigger>
                     <TabsTrigger value="geometry">형상 (Geometry)</TabsTrigger>
-                    <TabsTrigger value="modeling">3D 모델링 (3D View)</TabsTrigger>
+                    {/* 3D Model View Removed */}
                     <TabsTrigger value="results">결과 (Results)</TabsTrigger>
                     <TabsTrigger value="climate">기후 (Climate)</TabsTrigger>
                 </TabsList>
@@ -122,16 +121,14 @@ export default function ProjectDetailsPage() {
                     <ProjectGeometryView projectId={params.id as string} />
                 </TabsContent>
 
-                <TabsContent value="modeling" className="mt-6 border rounded-lg overflow-hidden bg-slate-50">
-                    <ThreeDView projectId={params.id as string} />
-                </TabsContent>
+                {/* 3D Model Content Removed */}
 
                 <TabsContent value="results" className="mt-6">
                     <ResultsView projectId={params.id as string} isActive={activeTab === "results"} />
                 </TabsContent>
 
                 <TabsContent value="climate" className="mt-6">
-                    <ClimateView projectId={params.id as string} />
+                    <ClimateView project={project} />
                 </TabsContent>
             </Tabs>
         </div >

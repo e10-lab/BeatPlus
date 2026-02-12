@@ -2,7 +2,7 @@ import { PVSystem } from "@/types/system";
 import { calculateHourlyRadiation } from "./solar-calc";
 
 /**
- * 시간당 태양광 발전량 계산 (DIN V 18599-9)
+ * 시간당 태양광 발전량 계산 (DIN/TS 18599-9:2025-10)
  * AC 에너지 발전량 [Wh]을 산출합니다.
  */
 

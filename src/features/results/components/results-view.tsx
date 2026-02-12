@@ -10,12 +10,20 @@ import { getSurfaces } from "@/services/surface-service";
 import { getConstructions } from "@/services/construction-service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, Zap, Leaf, Factory, Sun } from "lucide-react";
-import { Zone } from "@/types/project";
+import { Zone, Construction } from "@/types/project";
+import { Download, FileSpreadsheet } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { MonthlyDemandChart } from "./monthly-demand-chart";
+
 import { EnergyBalanceChart } from "./energy-balance-chart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HourlyAnalysisView } from "./hourly-analysis-view";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 interface ResultsViewProps {
@@ -28,6 +36,7 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
     const [results, setResults] = useState<CalculationResults | null>(null);
     const [weatherData, setWeatherData] = useState<ClimateData | null>(null);
     const [selectedZoneId, setSelectedZoneId] = useState<string>("total");
+    const [constructions, setConstructions] = useState<Construction[]>([]);
 
     useEffect(() => {
         if (!isActive) return; // Skip if not active tab
@@ -39,14 +48,18 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                 const project = await getProject(projectId);
 
                 // 2. Fetch Zones & Constructions
-                const [zones, constructions] = await Promise.all([
+                const [allZones, fetchedConstructions] = await Promise.all([
                     getZones(projectId),
                     getConstructions(projectId)
                 ]);
+                setConstructions(fetchedConstructions);
+
+                // Deduplicate zones by id just in case
+                const uniqueZones = Array.from(new Map(allZones.map(z => [z.id, z])).values());
 
                 // 3. Fetch Surfaces for each Zone and build ZoneInput
                 const zoneInputs: ZoneInput[] = await Promise.all(
-                    zones.map(async (zone: Zone) => {
+                    uniqueZones.map(async (zone: Zone) => {
                         const surfaces = await getSurfaces(projectId, zone.id!);
                         return {
                             ...zone,
@@ -75,7 +88,7 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                 }
                 setWeatherData(loadedWeatherData);
 
-                // 5. Run Calculation
+                // 5. Run Calculation (Monthly Method)
                 const calcResults = calculateEnergyDemand(
                     zoneInputs,
                     loadedWeatherData,
@@ -84,7 +97,8 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                     project?.ventilationUnits,
                     project?.automationConfig,
                     project?.systems, // Use systems from project
-                    constructions
+                    fetchedConstructions,
+                    "monthly" // Explicitly Monthly
                 );
                 setResults(calcResults);
 
@@ -98,7 +112,130 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
         loadDataAndCalculate();
     }, [projectId, isActive]);
 
+    // [New] Energy Demand Verification CSV
+    const downloadEnergyDemandVerificationCSV = () => {
+        if (!results) return;
+
+        let csv = "\uFEFFEnergy Demand Verification (DIN/TS 18599-2:2025-10)\n";
+        // Header
+        csv += "Zone,Month,Days_Op,Days_NonOp,Te_avg (C),Ti_op (C),Ti_nonOp (C),H_tr (W/K),H_ve (W/K),QT_op (kWh),QV_op (kWh),QS_op (kWh),QI_op (kWh),QT_nonOp (kWh),QV_nonOp (kWh),QS_nonOp (kWh),QI_nonOp (kWh),Q_Storage_Transfer (kWh),Delta_Q_C_b_we (kWh),eta_H,gamma_H,Qh_need (kWh),eta_C,gamma_C,Qc_need (kWh)\n";
+
+        results.zones.forEach(z => {
+            z.monthly.forEach(m => {
+                const Te = weatherData?.monthly.find(w => w.month === m.month)?.Te || 0;
+                csv += `"${z.zoneName}",${m.month},${(m.d_nutz || 0).toFixed(1)},${(m.d_we || 0).toFixed(1)},${Te.toFixed(2)}`;
+                csv += `,${(m.avg_Ti_op || 0).toFixed(2)},${(m.avg_Ti_non_op || 0).toFixed(2)}`;
+                csv += `,${(m.H_tr || 0).toFixed(1)},${(m.H_ve || 0).toFixed(1)}`;
+                csv += `,${(m.QT_op || 0).toFixed(2)},${(m.QV_op || 0).toFixed(2)},${(m.QS_op || 0).toFixed(2)},${(m.QI_op || 0).toFixed(2)}`;
+                csv += `,${(m.QT_non_op || 0).toFixed(2)},${(m.QV_non_op || 0).toFixed(2)},${(m.QS_non_op || 0).toFixed(2)},${(m.QI_non_op || 0).toFixed(2)}`;
+                csv += `,${(m.Q_storage_transfer || 0).toFixed(3)},${(m.Delta_Q_C_b_we || 0).toFixed(3)}`;
+                csv += `,${(m.eta || 0).toFixed(4)},${(m.gamma || 0).toFixed(4)},${(m.Q_heating || 0).toFixed(2)}`;
+                csv += `,${(m.eta_C || 0).toFixed(4)},${(m.gamma_C || 0).toFixed(4)},${(m.Q_cooling || 0).toFixed(2)}`;
+                csv += "\n";
+            });
+        });
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `energy_demand_verification_${projectId}.csv`;
+        a.click();
+    };
+
+    // [New] Time Constant Analysis CSV (Consolidated Verification)
+    const downloadTimeConstantCSV = () => {
+        if (!results) return;
+
+        let csv = "\uFEFFTime Constant Analysis (DIN 18599-2)\n";
+        // Header
+        csv += "Zone,Month,Te_avg (C),Theta_int_H (C),Theta_i_h (C),Theta_i_op (C),Theta_i_non_op (C),tau_h (h),tau_c (h),Cm (Wh/K),H_tr (W/K),V_net (m3),n_nutz (1/h),n_inf (1/h),n_win (1/h),n_mech (1/h),n_win_min (1/h),Delta_n_win,Delta_n_win_mech,n_SUP (1/h),n_ETA (1/h),t_v_mech (h),eta_WRG,isForcedMech,H_ve_inf (W/K),H_ve_win (W/K),H_ve_mech (W/K),H_ve (W/K),H_tot (W/K),H_tot_tau_h (W/K),H_tot_tau_c (W/K),a_H,eta_H,gamma_H,f_adapt,f_NA,f_we,Theta_int_C (C),a_C,eta_C,gamma_C,t_h_op_d (h/d),t_NA (h/d),Delta_theta_i_NA (K),delta_theta_EMS (K)\n";
+
+        const RHO_C = 0.34; // ρ·c [Wh/(m³·K)]
+
+        results.zones.forEach(z => {
+            z.monthly.forEach(m => {
+                const Te = weatherData?.monthly.find(w => w.month === m.month)?.Te || 0;
+
+                // H_tot_tau 역산: tau = Cm / H_tot_tau -> H_tot_tau = Cm / tau
+                const tau_h_val = m.tau_h || m.tau || 0;
+                const tau_c_val = m.tau_c || m.tau || 0;
+                const Cm_val = m.Cm || 0;
+                const H_tot_tau_h = tau_h_val > 0 ? Cm_val / tau_h_val : 0;
+                const H_tot_tau_c = tau_c_val > 0 ? Cm_val / tau_c_val : 0;
+
+                // 이용효율 계수 a = 1 + tau/16 (Updated to match calculator.ts)
+                const a_H = m.a_H || (1 + tau_h_val / 16);
+                const a_C = m.a_C || (1 + tau_c_val / 16);
+
+                // H_ve 세분화: H = V · ρc · n
+                const V = m.V_net || 0;
+                const n_inf = m.n_inf || 0;
+                const n_win = m.n_win || 0;
+                const n_mech = m.n_mech || 0;
+                const H_ve_inf = V * RHO_C * n_inf;
+                const H_ve_win = V * RHO_C * n_win;
+                const H_ve_mech = V * RHO_C * n_mech;
+
+                csv += `"${z.zoneName}",${m.month},${Te.toFixed(2)}`;
+                csv += `,${(m.Theta_int_H || 0).toFixed(2)}`;
+                csv += `,${(m.Theta_i_h || 0).toFixed(2)}`;
+                csv += `,${(m.avg_Ti_op || m.avg_Ti || 0).toFixed(2)}`;
+                csv += `,${(m.avg_Ti_non_op || 0).toFixed(2)}`;
+                csv += `,${tau_h_val.toFixed(1)}`;
+                csv += `,${tau_c_val.toFixed(1)}`;
+                csv += `,${Cm_val.toFixed(0)}`;
+                csv += `,${(m.H_tr || 0).toFixed(1)}`;
+                csv += `,${V.toFixed(1)}`;
+                csv += `,${(m.n_nutz || 0).toFixed(4)}`;
+                csv += `,${n_inf.toFixed(4)}`;
+                csv += `,${n_win.toFixed(4)}`;
+                csv += `,${n_mech.toFixed(4)}`;
+                csv += `,${(m.n_win_min || 0).toFixed(4)}`;
+                csv += `,${(m.Delta_n_win || 0).toFixed(4)}`;
+                csv += `,${(m.Delta_n_win_mech || 0).toFixed(4)}`;
+                csv += `,${(m.n_SUP || 0).toFixed(4)}`;
+                csv += `,${(m.n_ETA || 0).toFixed(4)}`;
+                csv += `,${(m.t_v_mech || 0).toFixed(1)}`;
+                csv += `,${(m.heatRecoveryEff || 0).toFixed(2)}`;
+                csv += `,${(m as any).isForcedMech ?? ''}`;
+                csv += `,${H_ve_inf.toFixed(2)}`;
+                csv += `,${H_ve_win.toFixed(2)}`;
+                csv += `,${H_ve_mech.toFixed(2)}`;
+                csv += `,${(m.H_ve || 0).toFixed(1)}`;
+                csv += `,${(m.H_tot || 0).toFixed(1)}`;
+                csv += `,${H_tot_tau_h.toFixed(1)}`;
+                csv += `,${H_tot_tau_c.toFixed(1)}`;
+                csv += `,${a_H.toFixed(2)}`;
+                csv += `,${(m.eta || 0).toFixed(4)}`;
+                csv += `,${(m.gamma || 0).toFixed(4)}`;
+                csv += `,${(m.f_adapt || 0).toFixed(2)}`;
+                csv += `,${(m.f_NA || 0).toFixed(6)}`;
+                csv += `,${(m.f_we || 0).toFixed(6)}`;
+                csv += `,${(m.Theta_int_C || 0).toFixed(2)}`;
+                csv += `,${a_C.toFixed(2)}`;
+                csv += `,${(m.eta_C ?? 0).toFixed(4)}`;
+                csv += `,${(m.gamma_C || 0).toFixed(4)}`;
+                csv += `,${(m.t_h_op_d || 0).toFixed(1)}`;
+                csv += `,${(m.t_NA || 0).toFixed(1)}`;
+                csv += `,${(m.Delta_theta_i_NA || 0).toFixed(2)}`;
+                csv += `,${(m.delta_theta_EMS || 0).toFixed(2)}`;
+                csv += "\n";
+            });
+        });
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `time_constant_analysis_${projectId}.csv`;
+        a.click();
+    };
+
+
+
     if (loading) {
+
         return (
             <div className="flex justify-center items-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -133,21 +270,45 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
             {/* Zone Selector */}
             <div className="flex justify-between items-center bg-muted/20 p-4 rounded-lg">
                 <div>
-                    <h2 className="text-lg font-semibold tracking-tight">에너지 해석 결과 (DIN/TS 18599:2025-10)</h2>
-                    <p className="text-sm text-muted-foreground">최신 표준 기반 5R1C 시간별 시뮬레이션 및 1차 에너지 산출</p>
+                    <h2 className="text-lg font-semibold tracking-tight">에너지 해석 결과 (Monthly)</h2>
+                    <p className="text-sm text-muted-foreground">
+                        DIN V 18599 월간 정적 계산 (Monthly Balance Method)
+                    </p>
                 </div>
-                <Select value={selectedZoneId} onValueChange={setSelectedZoneId}>
-                    <SelectTrigger className="w-[240px] bg-background">
-                        <SelectValue placeholder="결과 범위 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="total">전체 건물 (Total)</SelectItem>
-                        {results.zones.map((z: ZoneResult) => (
-                            <SelectItem key={z.zoneId} value={z.zoneId}>{z.zoneName}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                    {/* Method Selector Removed */}
+
+                    <Select value={selectedZoneId} onValueChange={setSelectedZoneId}>
+                        <SelectTrigger className="w-[200px] bg-background">
+                            <SelectValue placeholder="결과 범위 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="total">전체 건물 (Total)</SelectItem>
+                            {results.zones.map((z: ZoneResult) => (
+                                <SelectItem key={z.zoneId} value={z.zoneId}>{z.zoneName}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Download className="w-4 h-4 mr-2" />
+                                검증 리포트 (CSV)
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem onClick={downloadTimeConstantCSV}>
+                                시간상수 상세 분석 (CSV)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={downloadEnergyDemandVerificationCSV}>
+                                에너지 요구량 상세 검증 (CSV)
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </div>
+
 
             {/* 1차 에너지 및 탄소 배출량 요약 (전체 보기일 때만 표시 권장) */}
             {isTotal && yearlyData.primaryEnergy && (
@@ -237,9 +398,8 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
             </div>
 
             <Tabs defaultValue="monthly" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-4">
+                <TabsList className="grid w-full grid-cols-1 mb-4">
                     <TabsTrigger value="monthly" className="gap-2"><Leaf className="h-4 w-4" /> 월별 분석 (Monthly)</TabsTrigger>
-                    <TabsTrigger value="hourly" className="gap-2"><Zap className="h-4 w-4" /> 시간별 상세 (Hourly)</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="monthly" className="space-y-6">
@@ -273,6 +433,12 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                     </div>
 
                     {/* 월별 데이터 테이블 */}
+                    <div className="flex justify-end mb-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-3">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-600"></span>손실 (Loss)</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-600"></span>획득 (Gain)</span>
+                        </span>
+                    </div>
                     <Card>
                         <CardHeader>
                             <CardTitle>
@@ -294,7 +460,9 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                                     <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
                                         <tr>
                                             <th className="px-4 py-2">월</th>
-                                            <th className="px-4 py-2">실내온도 (°C)</th>
+                                            <th className="px-4 py-2">외기온도 (°C)</th>
+                                            <th className="px-4 py-2">실내-사용 (°C)</th>
+                                            <th className="px-4 py-2">실내-비사용 (°C)</th>
                                             <th className="px-4 py-2">전도열</th>
                                             <th className="px-4 py-2">환기열</th>
                                             <th className="px-4 py-2">태양열</th>
@@ -311,11 +479,19 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                                             return (
                                                 <tr key={m.month} className="border-b hover:bg-muted/10 transition-colors">
                                                     <td className="px-4 py-2 font-medium">{m.month}월</td>
-                                                    <td className="px-4 py-2">{m.avg_Ti?.toFixed(1) ?? "-"}</td>
-                                                    <td className={`px-4 py-2 ${m.QT > 0 ? "text-blue-600" : "text-gray-600"}`}>{(Math.abs(m.QT) / area).toFixed(1)}</td>
-                                                    <td className={`px-4 py-2 ${m.QV > 0 ? "text-blue-600" : "text-gray-600"}`}>{(Math.abs(m.QV) / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 text-gray-600">{(m.QS / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 text-gray-600">{(m.QI / area).toFixed(1)}</td>
+                                                    <td className="px-4 py-2 text-muted-foreground">
+                                                        {weatherData?.monthly.find(w => w.month === m.month)?.Te.toFixed(1) ?? "-"}
+                                                    </td>
+                                                    <td className="px-4 py-2">{m.avg_Ti_op?.toFixed(1) ?? m.avg_Ti.toFixed(1)}</td>
+                                                    <td className="px-4 py-2 text-muted-foreground">{m.avg_Ti_non_op?.toFixed(1) ?? "-"}</td>
+                                                    <td className={`px-4 py-2 ${m.QT > 0 ? "text-red-600 font-medium" : m.QT < 0 ? "text-blue-600 font-medium" : "text-gray-600"}`}>
+                                                        {(Math.abs(m.QT) / area).toFixed(1)}
+                                                    </td>
+                                                    <td className={`px-4 py-2 ${m.QV > 0 ? "text-red-600 font-medium" : m.QV < 0 ? "text-blue-600 font-medium" : "text-gray-600"}`}>
+                                                        {(Math.abs(m.QV) / area).toFixed(1)}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-red-600 font-medium">{(Math.abs(m.QS) / area).toFixed(1)}</td>
+                                                    <td className="px-4 py-2 text-red-600 font-medium">{(Math.abs(m.QI) / area).toFixed(1)}</td>
                                                     <td className="px-4 py-2 font-bold text-orange-600">{(m.Q_dhw / area).toFixed(1)}</td>
                                                     <td className="px-4 py-2 font-bold text-red-700">{(m.Q_heating / area).toFixed(1)}</td>
                                                     <td className="px-4 py-2 font-bold text-blue-700">{(m.Q_cooling / area).toFixed(1)}</td>
@@ -328,10 +504,6 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                             </div>
                         </CardContent>
                     </Card>
-                </TabsContent>
-
-                <TabsContent value="hourly">
-                    <HourlyAnalysisView zones={results.zones} selectedZoneId={selectedZoneId} />
                 </TabsContent>
             </Tabs>
         </div>

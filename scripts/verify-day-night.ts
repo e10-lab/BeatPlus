@@ -16,8 +16,7 @@ const zoneWithWindows: ZoneInput = {
     surfaces: [
         {
             id: 's1', zoneId: 'zone-win', name: 'Win', type: 'window',
-            area: 20, uValue: 1.5, orientation: 'S', tilt: 90, shgc: 0.6,
-            shading: { hasDevice: false, fcValue: 1.0, type: 'external' }
+            area: 20, uValue: 1.5, orientation: 'S', tilt: 90, shgc: 0.7
         } as Surface
     ],
     isExcluded: false,

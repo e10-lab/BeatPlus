@@ -37,8 +37,7 @@ const mockWindow: Surface = {
     uValue: 1.5,
     orientation: 'S',
     tilt: 90,
-    shgc: 0.7,
-    shading: { hasDevice: false, fcValue: 1.0, type: 'external' }
+    shgc: 0.7
 };
 
 mockZone.surfaces = [mockWindow];

@@ -45,14 +45,15 @@ import {
 const formSchema = z.object({
     name: z.string().min(1, { message: "존 이름을 입력해주세요." }),
     usageType: z.enum([
-        "1_office", "2_open_plan", "3_meeting", "4_library", "5_retail",
-        "6_retail_large", "7_classroom", "8_lecture_hall", "9_bed_room", "10_hotel_room",
-        "11_canteen", "12_restaurant", "13_kitchen", "14_storage_heated", "15_storage_unheated",
-        "16_parking", "17_workshop_light", "17_1_workshop_medium", "18_workshop_heavy", "19_gym",
-        "20_fitness", "21_pool", "22_lab", "23_exam_room", "24_icu", "25_corridor_care",
-        "26_medical_practice", "27_exhibition", "28_trade_fair",
-        "33_foyer", "34_retail_refrig", "35_kitchen_high", "36_hotel_wellness",
-        "38_server", "39_datacenter", "41_logistics",
+        "1_office", "2_group_office", "3_open_plan", "4_meeting", "5_counter_hall",
+        "6_retail", "7_retail_refrig", "8_classroom", "9_lecture_hall", "10_bed_room",
+        "11_hotel_room", "12_canteen", "13_restaurant", "14_kitchen", "15_kitchen_prep",
+        "16_wc", "17_other_rooms", "18_ancillary", "19_traffic", "20_storage_tech",
+        "21_datacenter", "22_workshop_heavy", "23_workshop_medium", "24_workshop_light",
+        "25_auditorium_theater", "26_foyer_theater", "27_stage_theater", "28_trade_fair",
+        "29_museum", "30_library_reading", "31_library_open", "32_library_storage",
+        "33_gym", "34_parking_office", "35_parking_public", "36_sauna", "37_fitness",
+        "38_lab", "39_exam_room", "40_special_care", "41_logistics",
         "42_res_single", "43_res_multi", "44_dorm"
     ]),
     area: z.coerce.number().min(0.1, { message: "면적은 0보다 커야 합니다." }),
@@ -319,8 +320,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                                                 </CardHeader>
                                                                 <CardContent className="text-sm pt-4 space-y-2">
                                                                     <div className="flex justify-between"><span>습도 요구사항</span> <span className="font-mono">{selectedProfile.humidityRequirement}</span></div>
-                                                                    <div className="flex justify-between"><span>최소 외기 도입량</span> <span className="font-mono">{selectedProfile.minOutdoorAir} m³/(h·m²)</span></div>
-                                                                    <div className="flex justify-between"><span>최소 외기 체적 유량</span> <span className="font-mono">{selectedProfile.minOutdoorAirFlow} m³/(h·m²)</span></div>
+                                                                    <div className="flex justify-between"><span>최소 외기 체적 유량</span> <span className="font-mono">{selectedProfile.minOutdoorAir} m³/(h·m²)</span></div>
                                                                 </CardContent>
                                                             </Card>
                                                             <Card>
