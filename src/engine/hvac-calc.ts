@@ -170,7 +170,7 @@ export function calculateHourlyHvac(
     // 방열 방식에 따른 효율
     let eth_em_h = 0.93; // 일반 라디에이터
     if (heatingSystem?.emission.type === "floor_heating") eth_em_h = 0.97; // 바닥 난방
-    if (heatingSystem?.emission.type === "air_heating") eth_em_h = 0.90; // 공기 가열
+    if (heatingSystem?.emission.type === "supply_air") eth_em_h = 0.90; // 공기 가열
 
     // 냉방 시스템 설정
     let eth_dist_c = 0.95;
@@ -231,7 +231,7 @@ export function calculateHourlyHvac(
                 // 팬 보조 전력 계산 (팬코일 또는 공기 가열 방식)
                 const isEHP = heatingSystem.generator.type === "ehp" || heatingSystem.generator.type === "split";
 
-                if (isEHP || ["fan_coil", "air_heating"].includes(heatingSystem.emission.type)) {
+                if (isEHP || ["fcu", "supply_air"].includes(heatingSystem.emission.type)) {
                     let P_fan = 0;
                     if (heatingSystem.emission.fanPower) {
                         P_fan = heatingSystem.emission.fanPower;

@@ -21,9 +21,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Flame, Droplets, Snowflake, Sun, Wind, RefreshCw, Lightbulb } from "lucide-react";
+import { Flame, Droplets, Snowflake, Sun, Wind, RefreshCw, Lightbulb, ThermometerSun, Network, Database } from "lucide-react";
 import { useState, useEffect } from "react";
 import { GeneratorSelection } from "./generator-selection";
+import { HeatingEmissionParams } from "./heating-emission-params";
+import { HeatingDistributionParams } from "./heating-distribution-params";
+import { HeatingStorageParams } from "./heating-storage-params";
 
 // Types for form
 const systemBaseSchema = z.object({
@@ -66,10 +69,45 @@ const heatingSchema = systemBaseSchema.extend({
     }),
     distribution: z.object({
         temperatureRegime: z.enum(["90/70", "70/50", "55/45", "35/28"]),
-        pumpControl: z.enum(["const_pressure", "prop_pressure", "uncontrolled"]),
+        pumpControl: z.enum(["const_pressure", "prop_pressure", "uncontrolled"]).optional(),
+        pipeLength: z.coerce.number().optional(),
+        pipeInsulation: z.enum(["none", "basic", "good", "reinforced"]).optional(),
+        operatingMode: z.enum(["continuous", "daytime_only", "night_setback", "weekend_shutdown"]).optional(),
     }),
+    storage: z.object({
+        volume: z.coerce.number().optional(),
+        temperature: z.coerce.number().optional(),
+        location: z.enum(["conditioned", "unconditioned"]).optional(),
+    }).optional(),
     emission: z.object({
-        type: z.enum(["radiator", "floor_heating", "fan_coil", "air_heating"]),
+        spaceCategory: z.enum(["standard", "hall"]).optional(),
+        type: z.enum([
+            "radiator", "convector", "fcu", "floor_heating", "wall_heating", "ceiling_heating",
+            "tabs", "supply_air", "electric_heater",
+            "hall_air", "infrared_radiant", "ceiling_radiant_panel", "hall_floor_heating"
+        ]),
+        pipingType: z.enum(["two_pipe", "one_pipe_improved", "one_pipe", "distributed"]).optional(),
+        radiatorPosition: z.enum(["interior_wall", "exterior_wall_opaque", "exterior_wall_transparent"]).optional(),
+        sunProtection: z.boolean().optional(),
+        embeddingType: z.enum(["wet", "dry", "low_coverage"]).optional(),
+        floorInsulation: z.enum(["none", "standard", "enhanced"]).optional(),
+        tabsControlType: z.enum(["constant_temp", "central_or_electric"]).optional(),
+        designTempDiff: z.string().optional(),
+        isIntermittent: z.boolean().optional(),
+        hasVerticalFan: z.boolean().optional(),
+        hallAirSubType: z.enum(["wall_horizontal", "low_temp_horizontal", "ceiling_downward", "low_temp_ceiling", "ceiling_fan_2pos", "ceiling_fan_pi"]).optional(),
+        infraredSubType: z.enum(["standard", "improved"]).optional(),
+        ceilingPanelSubType: z.enum(["general", "standard", "improved", "standard_no_gap", "standard_gap", "improved_no_gap", "improved_gap"]).optional(),
+        roomHeight: z.coerce.number().optional(),
+        controlType: z.enum(["manual", "central", "electromechanical", "p_control", "pi_control", "pi_optimized"]).optional(),
+        isCertified: z.boolean().optional(),
+        hydraulicBalancing: z.enum(["none", "static", "static_group_static", "static_group_dynamic", "dynamic", "static_loop", "dynamic_loop", "dynamic_return_temp", "dynamic_delta_temp"]).optional(),
+        emitterCount: z.coerce.number().optional(),
+        roomAutomation: z.enum(["none", "time_control", "start_stop_optimized", "full_automation"]).optional(),
+        hasVentilationLink: z.boolean().optional(),
+        fanPower: z.coerce.number().optional(),
+        convectiveFraction: z.coerce.number().optional(),
+        maxCapacity: z.coerce.number().optional(),
     }),
 });
 
@@ -201,7 +239,14 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                     pumpControl: "prop_pressure",
                 },
                 emission: {
+                    spaceCategory: "standard",
                     type: "radiator",
+                    controlType: "p_control",
+                    isCertified: false,
+                    hydraulicBalancing: "static",
+                    roomAutomation: "time_control",
+                    pipingType: "two_pipe",
+                    roomHeight: 3.0,
                 },
             };
         } else if (type === "COOLING") {
@@ -605,6 +650,36 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                             {/* Heating Specific Fields */}
                             {activeType === "HEATING" && (
                                 <>
+                                    {/* 1. 방열 및 제어 */}
+                                    <div className="space-y-4 border p-4 rounded-md">
+                                        <h3 className="font-semibold text-sm flex items-center gap-2">
+                                            <ThermometerSun className="h-4 w-4" /> 방열 및 제어
+                                        </h3>
+                                        <HeatingEmissionParams
+                                            form={form}
+                                            zones={zones}
+                                            isShared={form.watch("isShared")}
+                                            linkedZoneIds={form.watch("linkedZoneIds")}
+                                        />
+                                    </div>
+
+                                    {/* 2. 분배 */}
+                                    <div className="space-y-4 border p-4 rounded-md">
+                                        <h3 className="font-semibold text-sm flex items-center gap-2">
+                                            <Network className="h-4 w-4" /> 분배
+                                        </h3>
+                                        <HeatingDistributionParams form={form} />
+                                    </div>
+
+                                    {/* 3. 저장 */}
+                                    <div className="space-y-4 border p-4 rounded-md">
+                                        <h3 className="font-semibold text-sm flex items-center gap-2">
+                                            <Database className="h-4 w-4" /> 저장
+                                        </h3>
+                                        <HeatingStorageParams form={form} />
+                                    </div>
+
+                                    {/* 4. 열원 */}
                                     <div className="space-y-4 border p-4 rounded-md">
                                         <h3 className="font-semibold text-sm flex items-center gap-2">
                                             <Flame className="h-4 w-4" /> 열원 (Generator)
@@ -627,44 +702,14 @@ export function SystemForm({ projectId, system, zones, onSave, onCancel }: Syste
                                                     </FormItem>
                                                 )}
                                             />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4 border p-4 rounded-md">
-                                        <h3 className="font-semibold text-sm">분배 및 방열</h3>
-                                        <div className="grid grid-cols-2 gap-4">
                                             <FormField
                                                 control={form.control as any}
-                                                name="distribution.temperatureRegime"
+                                                name="generator.capacity"
                                                 render={({ field }) => (
                                                     <FormItem>
-                                                        <FormLabel>온도 조건</FormLabel>
-                                                        <Select onValueChange={field.onChange} defaultValue={field.value as string}>
-                                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                            <SelectContent>
-                                                                <SelectItem value="90/70">90/70 °C</SelectItem>
-                                                                <SelectItem value="70/50">70/50 °C</SelectItem>
-                                                                <SelectItem value="55/45">55/45 °C</SelectItem>
-                                                                <SelectItem value="35/28">35/28 °C</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </FormItem>
-                                                )}
-                                            />
-                                            <FormField
-                                                control={form.control as any}
-                                                name="emission.type"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormLabel>방열 방식</FormLabel>
-                                                        <Select onValueChange={field.onChange} defaultValue={field.value as string}>
-                                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                            <SelectContent>
-                                                                <SelectItem value="radiator">라디에이터</SelectItem>
-                                                                <SelectItem value="floor_heating">바닥 난방</SelectItem>
-                                                                <SelectItem value="fan_coil">팬코일 유닛</SelectItem>
-                                                                <SelectItem value="air_heating">공기 난방</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
+                                                        <FormLabel>용량 (kW)</FormLabel>
+                                                        <FormControl><Input type="number" step="0.1" {...field} /></FormControl>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />

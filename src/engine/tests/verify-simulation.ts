@@ -76,9 +76,9 @@ async function runTests() {
 
         // Test Case 2: Residential (Profile 42)
         console.log("\n------------------------------------------------");
-        console.log("Test Case 2: Residential Single (Profile: 42_res_single)");
+        console.log("Test Case 2: Residential Single (Profile: 44_res_single)");
         console.log("------------------------------------------------");
-        const resZone = createMockZone('z2', '42_res_single', 100, 3);
+        const resZone = createMockZone('z2', '44_res_single', 100, 3);
         const resultsRes = calculateEnergyDemand([resZone]);
         const yearlyRes = resultsRes.zones[0].yearly;
 
@@ -94,7 +94,7 @@ async function runTests() {
         }
         // Residential DHW should be significant
         if (yearlyRes.dhwDemand < 100) { // < 1 kwh/m2a? too low. 
-            // 42_res_single DHW demand ~ 10-15 kWh/m2a usually? 
+            // 44_res_single DHW demand ~ 10-15 kWh/m2a usually? 
             // actually yearlyRes.dhwDemand is total kWh. Area 100.
             if ((yearlyRes.dhwDemand / 100) < 5) {
                 console.error("❌ DHW Demand too low for residential!");

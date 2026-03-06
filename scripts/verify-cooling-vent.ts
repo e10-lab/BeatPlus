@@ -64,14 +64,14 @@ const result = calculateEnergyDemand([mockZone], undefined, undefined, undefined
 const may = result.monthly[4]; // Month 5
 console.log(`May (Te=19.5, Solar=158):`);
 console.log(`- PV (Ventilation Loss): ${may.QV.toFixed(2)} kWh`);
-console.log(`- PH (Heating Demand): ${may.Q_heating.toFixed(2)} kWh`);
-console.log(`- PC (Cooling Demand): ${may.Q_cooling.toFixed(2)} kWh`);
+console.log(`- PH (Heating Demand): ${may.Q_h_b.toFixed(2)} kWh`);
+console.log(`- PC (Cooling Demand): ${may.Q_c_b.toFixed(2)} kWh`);
 console.log(`- Gains (Solar+Int): ${may.Qgain.toFixed(2)} kWh`);
 
 const june = result.monthly[5]; // Month 6
 console.log(`June (Te=23.5, Solar=153):`);
 console.log(`- PV (Ventilation Loss): ${june.QV.toFixed(2)} kWh`);
-console.log(`- PC (Cooling Demand): ${june.Q_cooling.toFixed(2)} kWh`);
+console.log(`- PC (Cooling Demand): ${june.Q_c_b.toFixed(2)} kWh`);
 
 // Baseline Calculation (Hand Calc Logic Check)
 // Volume = 300 m3.
@@ -106,9 +106,9 @@ console.log(`- PC (Cooling Demand): ${june.Q_cooling.toFixed(2)} kWh`);
 // In May (Te=19.5), Free Cooling is possible. Qc should be low/zero.
 
 const july = result.monthly[6];
-console.log(`July (Te=26.5): Cooling Demand = ${july.Q_cooling.toFixed(2)} kWh`);
+console.log(`July (Te=26.5): Cooling Demand = ${july.Q_c_b.toFixed(2)} kWh`);
 
-if (may.Q_cooling < july.Q_cooling * 0.7) {
+if (may.Q_c_b < july.Q_c_b * 0.7) {
     console.log("SUCCESS: Cooling load in May is significantly reduced via Ventilation.");
 } else {
     console.log("FAILURE: May Cooling Demand is still too high compared to July.");

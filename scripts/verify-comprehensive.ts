@@ -57,7 +57,7 @@ const resFreeCool = calculateEnergyDemand([caseFreeCool], undefined, undefined, 
 const may = resFreeCool.monthly[4];
 console.log(`5월 (외기온 Te=19.5):`);
 console.log(`- 환기 손실 (QV): ${may.QV.toFixed(1)} kWh (프리쿨링 효과로 인해 높게 나타나야 함)`);
-console.log(`- 냉방 수요 (Qc): ${may.Q_cooling.toFixed(1)} kWh`);
+console.log(`- 냉방 수요 (Qc): ${may.Q_c_b.toFixed(1)} kWh`);
 // 1월과 비교 (외기온 Te=-1.6, 최소 환기)
 const jan = resFreeCool.monthly[0];
 console.log(`1월 (외기온 Te=-1.6):`);

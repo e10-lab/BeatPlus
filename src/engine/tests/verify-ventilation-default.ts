@@ -40,7 +40,7 @@ async function runTest() {
     const jan = results.zones[0].monthly[0];
 
     console.log(`\nMonth: ${jan.month}`);
-    console.log(`Q_heating: ${jan.Q_heating.toFixed(2)} kWh`);
+    console.log(`Q_heating: ${jan.Q_h_b.toFixed(2)} kWh`);
 
     // We can't see internal flags directly, but we can check H_ve or Q_vent?
     // Hourly results not available in monthly method return (array empty).
@@ -60,7 +60,7 @@ async function runTest() {
     // H_ve = 300 * 0.34 * 1.33 = 136 W/K.
     // QV_heat approx = 136 * 11.16 = 1517 kWh.
 
-    console.log(`QV_heat: ${jan.QV_heat.toFixed(2)} kWh`);
+    console.log(`QV_heat: ${jan.QV.toFixed(2)} kWh`);
 
     // If it was Natural (Window), n_win would be calculated.
     // Usually n_win ~ n_nutz as well, but might be different.

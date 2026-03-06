@@ -22,7 +22,7 @@ export default function FirebaseCheckPage() {
         // Check Firebase App
         try {
             const apps = getApps();
-            setStatus((prev: any) => ({ ...prev, appsCount: apps.length, appName: app.name }));
+            setStatus((prev: any) => ({ ...prev, appsCount: apps.length, appName: app?.name || "None" }));
         } catch (e: any) {
             setError(e.message);
         }

@@ -65,7 +65,7 @@ async function runTest() {
     console.log(`\nMonth: ${jan.month}`);
     console.log(`d_nutz: ${jan.d_nutz}`);
     console.log(`d_we: ${jan.d_we}`);
-    console.log(`Q_heating: ${jan.Q_heating.toFixed(2)} kWh`);
+    console.log(`Q_heating: ${jan.Q_h_b.toFixed(2)} kWh`);
 
     if (jan.d_we && jan.d_we > 0) {
         console.log("✅ Use of Non-Usage Days confirmed.");

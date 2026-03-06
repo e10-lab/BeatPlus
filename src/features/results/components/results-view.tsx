@@ -24,6 +24,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BarChart3, Clock, Database, Search, Thermometer as ThermometerIcon, Zap as ZapIcon, Settings2 } from "lucide-react";
+
+// 분석 탭 컴포넌트 추가
+import { VerificationTable } from "./verification-table";
+import { SystemVerification } from "./system-verification";
+import { DataLineageDiagram } from "./data-lineage-diagram";
+
 
 
 interface ResultsViewProps {
@@ -129,8 +136,8 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                 csv += `,${(m.QT_op || 0).toFixed(2)},${(m.QV_op || 0).toFixed(2)},${(m.QS_op || 0).toFixed(2)},${(m.QI_op || 0).toFixed(2)}`;
                 csv += `,${(m.QT_non_op || 0).toFixed(2)},${(m.QV_non_op || 0).toFixed(2)},${(m.QS_non_op || 0).toFixed(2)},${(m.QI_non_op || 0).toFixed(2)}`;
                 csv += `,${(m.Q_storage_transfer || 0).toFixed(3)},${(m.Delta_Q_C_b_we || 0).toFixed(3)}`;
-                csv += `,${(m.eta || 0).toFixed(4)},${(m.gamma || 0).toFixed(4)},${(m.Q_heating || 0).toFixed(2)}`;
-                csv += `,${(m.eta_C || 0).toFixed(4)},${(m.gamma_C || 0).toFixed(4)},${(m.Q_cooling || 0).toFixed(2)}`;
+                csv += `,${(m.eta || 0).toFixed(4)},${(m.gamma || 0).toFixed(4)},${(m.Q_h_b || 0).toFixed(2)}`;
+                csv += `,${(m.eta_C || 0).toFixed(4)},${(m.gamma_C || 0).toFixed(4)},${(m.Q_c_b || 0).toFixed(2)}`;
                 csv += "\n";
             });
         });
@@ -257,6 +264,7 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
     const yearlyData = isTotal ? results.yearly : (currentZone?.yearly || {
         heatingDemand: 0, coolingDemand: 0, totalArea: 0, specificHeatingDemand: 0, specificCoolingDemand: 0,
         dhwDemand: 0, lightingDemand: 0, auxDemand: 0, pvGeneration: 0, selfConsumption: 0, pvExport: 0,
+        co2Emissions: 0,
         finalEnergy: { heating: 0, cooling: 0, dhw: 0, lighting: 0, auxiliary: 0 },
         primaryEnergy: { heating: 0, cooling: 0, dhw: 0, lighting: 0, auxiliary: 0, total: 0 }
     });
@@ -398,8 +406,11 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
             </div>
 
             <Tabs defaultValue="monthly" className="w-full">
-                <TabsList className="grid w-full grid-cols-1 mb-4">
+                <TabsList className={`grid w-full ${isTotal ? 'grid-cols-1' : 'grid-cols-4'} mb-4`}>
                     <TabsTrigger value="monthly" className="gap-2"><Leaf className="h-4 w-4" /> 월별 분석 (Monthly)</TabsTrigger>
+                    {!isTotal && <TabsTrigger value="verification" className="gap-2"><Search className="h-4 w-4" /> 상세 검증 (Details)</TabsTrigger>}
+                    {!isTotal && <TabsTrigger value="system" className="gap-2"><Settings2 className="h-4 w-4" /> 설비 검증 (Systems)</TabsTrigger>}
+                    {!isTotal && <TabsTrigger value="lineage" className="gap-2"><Database className="h-4 w-4" /> 데이터 계보 (Lineage)</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="monthly" className="space-y-6">
@@ -492,9 +503,9 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                                                     </td>
                                                     <td className="px-4 py-2 text-red-600 font-medium">{(Math.abs(m.QS) / area).toFixed(1)}</td>
                                                     <td className="px-4 py-2 text-red-600 font-medium">{(Math.abs(m.QI) / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 font-bold text-orange-600">{(m.Q_dhw / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 font-bold text-red-700">{(m.Q_heating / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 font-bold text-blue-700">{(m.Q_cooling / area).toFixed(1)}</td>
+                                                    <td className="px-4 py-2 font-bold text-orange-600">{(m.Q_w_b / area).toFixed(1)}</td>
+                                                    <td className="px-4 py-2 font-bold text-red-700">{(m.Q_h_b / area).toFixed(1)}</td>
+                                                    <td className="px-4 py-2 font-bold text-blue-700">{(m.Q_c_b / area).toFixed(1)}</td>
                                                     <td className="px-4 py-2 font-bold text-purple-700">{(m.Q_aux / area).toFixed(1)}</td>
                                                 </tr>
                                             );
@@ -505,6 +516,23 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                {!isTotal && (
+                    <>
+                        <TabsContent value="verification" className="space-y-6">
+                            <VerificationTable data={monthlyData} />
+                        </TabsContent>
+
+                        <TabsContent value="system" className="space-y-6">
+                            <SystemVerification data={monthlyData} title={`${results.zones.find(z => z.zoneId === selectedZoneId)?.zoneName || '선택 존'} 설비 손실 상세 검증`} />
+                        </TabsContent>
+
+                        <TabsContent value="lineage" className="space-y-6">
+                            <DataLineageDiagram data={monthlyData} totalArea={area} />
+                        </TabsContent>
+
+                    </>
+                )}
             </Tabs>
         </div>
     );

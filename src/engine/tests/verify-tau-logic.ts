@@ -11,7 +11,7 @@ async function runTest() {
         id: 'zone-res-mech',
         projectId: 'test-project',
         name: 'Residential Mech',
-        usageType: '42_res_single', // Use a type starting with 4 to trigger isResidential=true
+        usageType: '44_res_single', // Use a type starting with 4 to trigger isResidential=true
         area: 100,
         height: 3,
         volume: 300,
@@ -94,7 +94,7 @@ async function runTest() {
         id: 'zone-mech-setback',
         projectId: 'test-project',
         name: 'Mechanical Setback Zone',
-        usageType: '42_res_single', // Residential
+        usageType: '44_res_single', // Residential
         area: 100,
         height: 3,
         volume: 300,
@@ -116,7 +116,7 @@ async function runTest() {
     }];
 
     const profileSetback: UsageProfile = {
-        ...DIN_18599_PROFILES['42_res_single'],
+        ...DIN_18599_PROFILES['44_res_single'],
         annualUsageDays: 260, // 5 days/week -> 2 days weekend
         hvacDailyOperationHours: 10,
         minOutdoorAir: 0 // Force calc based on usage
@@ -167,8 +167,8 @@ async function runTest() {
     // Check if we can overwrite the profile lookup?
     // Actually, for testing, we can modify the global object temporarily.
 
-    const originalProfile = DIN_18599_PROFILES['42_res_single'];
-    DIN_18599_PROFILES['42_res_single_365'] = {
+    const originalProfile = DIN_18599_PROFILES['44_res_single'];
+    DIN_18599_PROFILES['44_res_single_365'] = {
         ...originalProfile,
         annualUsageDays: 365,
         hvacDailyOperationHours: 10
@@ -177,7 +177,7 @@ async function runTest() {
     const zoneMech365: ZoneInput = {
         ...zoneMechSetback,
         id: 'zone-mech-365',
-        usageType: '42_res_single_365' as any // Cast to bypass enum check
+        usageType: '44_res_single_365' as any // Cast to bypass enum check
     };
 
     const resultB = calculateZoneMonthly(

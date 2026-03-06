@@ -63,15 +63,14 @@ export interface VentilationUnit {
 
 export type ZoneUsageType =
     | "1_office" | "2_group_office" | "3_open_plan" | "4_meeting" | "5_counter_hall"
-    | "6_retail" | "7_retail_refrig" | "8_classroom" | "9_lecture_hall" | "10_bed_room"
+    | "6_retail_department" | "7_retail_cooling" | "8_classroom" | "9_lecture_hall" | "10_bed_room"
     | "11_hotel_room" | "12_canteen" | "13_restaurant" | "14_kitchen" | "15_kitchen_prep"
-    | "16_wc" | "17_other_rooms" | "18_ancillary" | "19_traffic" | "20_storage_tech"
-    | "21_datacenter" | "22_workshop_heavy" | "23_workshop_medium" | "24_workshop_light"
-    | "25_auditorium_theater" | "26_foyer_theater" | "27_stage_theater" | "28_trade_fair"
-    | "29_museum" | "30_library_reading" | "31_library_open" | "32_library_storage"
-    | "33_gym" | "34_parking_office" | "35_parking_public" | "36_sauna" | "37_fitness"
-    | "38_lab" | "39_exam_room" | "40_special_care" | "41_logistics" | "42_res_single"
-    | "43_res_multi" | "44_dorm";
+    | "16_wc_sanitary" | "17_other_common" | "17_1_workshop_medium" | "18_ancillary_no_common" | "19_traffic_area"
+    | "20_storage_technical" | "21_data_center" | "22_industrial_heavy" | "23_industrial_medium" | "24_industrial_light"
+    | "25_audience_area" | "26_theater_foyer" | "27_stage" | "28_trade_fair_congress" | "29_exhibition_museum"
+    | "30_library_reading" | "31_library_open_access" | "32_library_stack" | "33_sports_hall" | "34_parking_private"
+    | "35_parking_public" | "36_sauna_area" | "37_fitness_room" | "38_laboratory" | "39_exam_treatment"
+    | "40_special_care" | "41_corridor_care" | "42_medical_practice" | "43_storage" | "44_res_single" | "45_res_multi";
 
 export interface Zone {
     id?: string;
@@ -181,6 +180,7 @@ export interface Construction {
     // 계산된 값
     uValue: number; // W/m²K
     shgc?: number; // 태양열 취득 계수 (창호/문 전용)
+    shgc_tot?: number; // 신규: 외부 차양 장치를 포함한 총 태양열 취득 계수 (g_tot)
     absorptionCoefficient?: number; // 태양 복사 흡수율 (불투명 외피 전용)
     totalThickness: number; // m
 

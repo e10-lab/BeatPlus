@@ -1,0 +1,93 @@
+
+import { calculateZoneMonthly, calculateRequiredAirChange } from '../calculator';
+import { ZoneInput, MonthlyClimateIndices } from '../types';
+import { DIN_18599_PROFILES } from '@/lib/din-18599-profiles';
+
+// Mock Zone
+const zone: ZoneInput = {
+    id: 'test-zone',
+    projectId: 'test-project',
+    name: 'Test Zone',
+    usageType: '1_office', // V_A = 4.0 approx? Need to check profile
+    area: 100, // 100 m2 Input Area
+    height: 3, // 3 m
+    surfaces: [],
+    temperatureSetpoints: { heating: 20, cooling: 26 },
+    heatingReducedMode: 'reduced',
+    ventilationMode: 'balanced_mech', // Force mechanical to see n_SUP/n_ETA
+    linkedVentilationUnitIds: [],
+    isExcluded: false
+};
+
+// Mock Climate (irrelevant for n_nutz but needed for function)
+const mockIndices: MonthlyClimateIndices[] = Array(12).fill(0).map((_, i) => ({
+    month: i + 1,
+    Te_avg: 10,
+    surfaceInsolation: {}
+}));
+
+// Mock Ventilation Config
+const ventConfig = {
+    type: 'mechanical' as const,
+    systemType: 'balanced' as const,
+    heatRecoveryEfficiency: 0.8,
+    dailyOperationHours: 10
+};
+
+console.log("--- Reproduction: Ventilation Area Calculation ---");
+
+const Area = zone.area;
+const Volume = Area * zone.height * 0.95; // 100 * 3 * 0.95 = 285 m3
+const profile = DIN_18599_PROFILES['1_office'];
+const minFlow = profile.minOutdoorAir || 0; // Likely 4.0 or similar
+
+console.log(`Input Area: ${Area} m2`);
+console.log(`Net Volume: ${Volume} m3`);
+console.log(`Min Outdoor Air (Profile): ${minFlow} m3/(h m2)`);
+
+// Current Calculation in Code
+// n_nutz = calculateRequiredAirChange(minFlow, Area, Volume);
+// We expect this to use Area (100) currently.
+// User wants it to use 0.95 * Area (95).
+
+// Let's call the function directly to see current behavior logic match
+// (Note: We can't easily call the private logic inside calculateZoneMonthly without running it)
+// We will run calculateZoneMonthly and check the returned verification params.
+
+const result = calculateZoneMonthly(
+    zone,
+    mockIndices,
+    undefined, // mainStructure
+    ventConfig,
+    undefined, // ventUnits
+    undefined, // autoConfig
+    [], // systems
+    []  // constructions
+);
+
+if (result && result.monthly.length > 0) {
+    const jan = result.monthly[0];
+    console.log(`\n[Result]`);
+    console.log(`A_NGF (Logged in Result): ${jan.A_NGF}`);
+    console.log(`n_nutz: ${jan.n_nutz}`);
+    console.log(`n_SUP: ${jan.n_SUP}`);
+    console.log(`n_ETA: ${jan.n_ETA}`);
+
+    // Manual Check
+    const expected_n_nutz_current = (minFlow * Area) / Volume;
+    const expected_n_nutz_target = (minFlow * (Area * 0.95)) / Volume;
+
+    console.log(`\n[Manual Calc Check]`);
+    console.log(`Expected n_nutz (Current - 100% Area): ${expected_n_nutz_current.toFixed(4)}`);
+    console.log(`Expected n_nutz (Target - 95% Area): ${expected_n_nutz_target.toFixed(4)}`);
+
+    if (Math.abs(jan.n_nutz! - expected_n_nutz_current) < 0.01) {
+        console.log("--> Current logic uses 100% Area.");
+    } else if (Math.abs(jan.n_nutz! - expected_n_nutz_target) < 0.01) {
+        console.log("--> Current logic uses 95% Area.");
+    } else {
+        console.log("--> Unknown logic.");
+    }
+} else {
+    console.error("Failed to calculate zone monthly.");
+}

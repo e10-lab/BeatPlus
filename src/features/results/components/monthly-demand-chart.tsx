@@ -15,9 +15,9 @@ export function MonthlyDemandChart({ data, totalArea }: MonthlyDemandChartProps)
     // Normalize data for chart
     const chartData = data.map(d => ({
         ...d,
-        Qh_spec: d.Q_heating / area,
-        Qc_spec: d.Q_cooling / area,
-        Qdhw_spec: d.Q_dhw / area,
+        Qh_spec: d.Q_h_b / area,
+        Qc_spec: d.Q_c_b / area,
+        Qdhw_spec: d.Q_w_b / area,
         Qaux_spec: d.Q_aux / area,
     }));
 

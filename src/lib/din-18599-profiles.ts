@@ -48,6 +48,12 @@ export interface UsageProfile {
     // 8. 건물 자동화 (Building Automation) - Table 9 (Non-Res) / Table 5 (Res)
     deltaThetaEMS?: { d: number; c: number; b: number; a: number }; // Δθ_EMS [K]
     fAdapt?: { d: number; c: number; b: number; a: number }; // f_adapt
+
+    // [New] Verification & Extra Params
+    heatingDailyOperationHours?: number; // h (난방 일일 가동 시간)
+    maintenanceFactor?: number; // k_L_m (유지율)
+    reductionFactorTaskArea?: number; // k_L_A (작업면 감소 계수)
+    minOutdoorAirBuilding?: number; // m³/(h·m²) (건물 전체 기준 외기 도입량)
 }
 
 export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
