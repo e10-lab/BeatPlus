@@ -275,10 +275,20 @@ function getStratificationDelta(input: {
     // 일반 공간 (≤ 4m)
     // ══════════════════════════════════════════════════
 
-    // 환기 연동 시 면난방도 Δθ_str = 0 (표 15 주석)
-    if (hasVentilationLink) {
-        if (['floor_heating', 'wall_heating', 'ceiling_heating'].includes(emitterType)) {
-            return 0;
+    // ══════════════════════════════════════════════════
+    // 일반 공간 (≤ 4m)
+    // ══════════════════════════════════════════════════
+
+    // 바닥/벽/천장 매립형 난방 층화 편차 (DIN/TS 18599-5 Tabelle 15)
+    if (['floor_heating', 'wall_heating', 'ceiling_heating'].includes(emitterType)) {
+        // 환기 연동 시 모든 매립형 난방 Δθ_str = 0 (표 15 주석)
+        if (hasVentilationLink) return 0.0;
+
+        switch (emitterType) {
+            case 'floor_heating': return 0.0; // 바닥 난방은 층화 편차 항상 0.0K
+            case 'wall_heating': return 0.4;  // 벽면 난방 0.4K
+            case 'ceiling_heating': return 0.7; // 천장 난방 0.7K
+            default: return 0.0;
         }
     }
 
@@ -289,13 +299,8 @@ function getStratificationDelta(input: {
         return (d1 + d2) / 2;
     }
 
-    // 표 15: 매립형 면난방
-    switch (emitterType) {
-        case 'floor_heating': return 0;
-        case 'wall_heating': return 0.4;
-        case 'ceiling_heating': return 0.7;
-        default: return 0; // TABS, 급기난방, 전기난방기
-    }
+    // 기타 (TABS, 급기난방, 전기난방기 등은 0K 고정 후 호출부에서 통합 처리됨)
+    return 0.0;
 }
 
 // ─── 표 19: 대공간 θ'_str (온도 구배, K/m) ───
@@ -717,7 +722,7 @@ export function calculateEmissionLoss(input: EmissionLossInput): EmissionLossRes
         const isCentral = tabsControlType === 'central_or_electric';
         const tabsIntegratedDelta = isCentral ? 2.7 : 3.0;
 
-        // TABS는 표 16에 의해 str, ctr, emb 가 하나로 통합 부여되며
+        // TABS는 표 16에 의해 str, ctr, emb 가 하나로 통합 부여됨
         delta_theta_str = tabsIntegratedDelta;
         delta_theta_ctr = 0;
         delta_theta_emb = 0;
@@ -725,6 +730,9 @@ export function calculateEmissionLoss(input: EmissionLossInput): EmissionLossRes
         delta_theta_rad = 0;
         delta_theta_im = 0;
         delta_theta_roomaut = 0;
+
+        // [수정] TABS도 수냉식 배관 시스템이므로 수력 편차는 별도 산출 (6.2.2.2절 적용)
+        delta_theta_hydr = getHydraulicDelta(hydraulicBalancing, pipingType, emitterCount);
     }
 
     // [신규] 급기 난방 (Zuluftnachheizung) 전용 통합 계산 (표 17, 6.2.2.4.6절)

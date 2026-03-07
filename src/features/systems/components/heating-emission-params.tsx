@@ -117,6 +117,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
         const sProt = form.watch("emission.sunProtection") || false;
         const isInter = form.watch("emission.isIntermittent") || false;
         const embType = form.watch("emission.embeddingType") || "wet";
+        const tabsCType = form.watch("emission.tabsControlType") || "constant_temp";
 
         // 1. 수력 균형 편차 (Δθ_hydr)
         let hydr = 0;
@@ -178,18 +179,25 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
         let str_emb = 0;
         switch (eType) {
             case "floor_heating":
-                str_emb = 0;
+                // 바닥 난방: 층화 편차 0.0K (DIN/TS 18599-5 Tabelle 15)
+                str_emb = 0.0;
                 if (embType === "wet") emb1 = 0.7;
                 else if (embType === "dry") emb1 = 0.4;
                 else if (embType === "low_coverage") emb1 = 0.2;
                 break;
             case "wall_heating":
-                str_emb = hVent ? 0 : 0.4;
+                // 벽면 난방: 층화 편차 0.4K (환기 연동 시 0.0K), 매립 편차 0.7K 고정
+                str_emb = hVent ? 0.0 : 0.4;
                 emb1 = 0.7;
                 break;
             case "ceiling_heating":
-                str_emb = hVent ? 0 : 0.7;
+                // 천장 난방: 층화 편차 0.7K (환기 연동 시 0.0K), 매립 편차 0.7K 고정
+                str_emb = hVent ? 0.0 : 0.7;
                 emb1 = 0.7;
+                break;
+            case "tabs":
+                // TABS: 통합 편차 (Δθ_str+ctr+emb) - 표 16 적용
+                str_emb = tabsCType === "central_or_electric" ? 2.7 : 3.0;
                 break;
         }
         switch (fIns) {
@@ -261,6 +269,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
         form.watch("emission.sunProtection"),
         form.watch("emission.isIntermittent"),
         form.watch("emission.embeddingType"),
+        form.watch("emission.tabsControlType"),
         emissionType,
         isHall
     ]);
@@ -569,8 +578,10 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                 )}
             </div>
 
-            {/* 노출형 방열기 상세 */}
-            {(emissionType === "radiator" || emissionType === "convector" || emissionType === "fcu") && (
+
+
+            {/* 노출형 방열기 및 TABS 배관 상세 */}
+            {(emissionType === "radiator" || emissionType === "convector" || emissionType === "fcu" || emissionType === "tabs") && (
                 <div className="grid grid-cols-2 gap-4 border-t pt-4 border-dashed mt-4 text-sm font-medium">
                     <FormField
                         control={form.control}
@@ -668,7 +679,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
             )}
 
             {/* 제어 (Control) 및 수력 균형 (Hydraulic) 공통 파라미터 */}
-            {emissionType !== "tabs" && emissionType !== "electric_heater" && emissionType !== "supply_air" && (
+            {emissionType !== "electric_heater" && emissionType !== "supply_air" && (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-4 border-dashed">
                     <FormField
                         control={form.control}
@@ -745,103 +756,109 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                             </FormItem>
                         )}
                     />
-                    <FormField
-                        control={form.control}
-                        name="emission.controlType"
-                        render={({ field }) => {
-                            const pipingType = form.watch("emission.pipingType");
-                            const isOnePipe = pipingType === "one_pipe" || pipingType === "one_pipe_improved";
-                            const isCertified = form.watch("emission.isCertified");
+                    
+                    {/* 제어 및 자동화 섹션 - TABS 제외 (통합 편차에 포함) */}
+                    {emissionType !== "tabs" && (
+                        <div className="col-span-2 grid grid-cols-2 gap-x-4 gap-y-2 pt-2 mt-2 border-t border-dotted">
+                            <FormField
+                                control={form.control}
+                                name="emission.controlType"
+                                render={({ field }) => {
+                                    const pipingType = form.watch("emission.pipingType");
+                                    const isOnePipe = pipingType === "one_pipe" || pipingType === "one_pipe_improved";
 
-                            return (
-                                <FormItem className="col-span-1">
-                                    <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap">
-                                        제어기 유형
-                                        <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">
-                                            (<InlineMath math={`\\Delta\\theta_{ctr} = +${calculatedDeltas.ctr.toFixed(1)}K`} />)
-                                        </span>
-                                    </FormLabel>
-                                    <Select 
-                                        onValueChange={field.onChange} 
-                                        value={isOnePipe ? "one_pipe_default" : (field.value || "p_control")}
-                                        disabled={isOnePipe}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="text-sm leading-tight px-2 h-10">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {isOnePipe ? (
-                                                <SelectItem value="one_pipe_default">
-                                                    1관식 통합 제어
-                                                </SelectItem>
-                                            ) : (
-                                                <>
-                                                    <SelectItem value="manual">수동 밸브</SelectItem>
-                                                    <SelectItem value="central">중앙 제어</SelectItem>
-                                                    <SelectItem value="electromechanical">기계식 2점 제어</SelectItem>
-                                                    <SelectItem value="p_control">비례 제어 (P)</SelectItem>
-                                                    <SelectItem value="pi_control">비례적분 제어 (PI)</SelectItem>
-                                                    <SelectItem value="pi_optimized">최적화 PI 제어</SelectItem>
-                                                </>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                            );
-                        }}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="emission.isCertified"
-                        render={({ field }) => (
-                            <FormItem className="flex items-center gap-2 pt-6">
-                                <FormControl><Switch checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                                <FormLabel className="!m-0 pb-1 cursor-pointer">제어기 인증 여부 (EN 15500-1)</FormLabel>
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="emission.roomAutomation"
-                        render={({ field }) => {
-                            const controlType = form.watch("emission.controlType");
-                            const pipingType = form.watch("emission.pipingType");
-                            // DIN/TS 18599-5 표 11, 12 규정: 
-                            // 개별 실내 제어가 불가능한 유형(manual, central)이거나 1관식인 경우 자동화 보정 적용 불가
-                            const isOnePipe = pipingType === "one_pipe" || pipingType === "one_pipe_improved";
-                            const isAutomationDisabled = isOnePipe || controlType === "manual" || controlType === "central";
+                                    return (
+                                        <FormItem className="col-span-1">
+                                            <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap">
+                                                제어기 유형
+                                                <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">
+                                                    (<InlineMath math={`\\Delta\\theta_{ctr} = +${calculatedDeltas.ctr.toFixed(1)}K`} />)
+                                                </span>
+                                            </FormLabel>
+                                            <Select 
+                                                onValueChange={field.onChange} 
+                                                value={isOnePipe ? "one_pipe_default" : (field.value || "p_control")}
+                                                disabled={isOnePipe}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger className="text-sm leading-tight px-2 h-10">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {isOnePipe ? (
+                                                        <SelectItem value="one_pipe_default">
+                                                            1관식 통합 제어
+                                                        </SelectItem>
+                                                    ) : (
+                                                        <>
+                                                            <SelectItem value="manual">수동 밸브</SelectItem>
+                                                            <SelectItem value="central">중앙 제어</SelectItem>
+                                                            <SelectItem value="electromechanical">기계식 2점 제어</SelectItem>
+                                                            <SelectItem value="p_control">비례 제어 (P)</SelectItem>
+                                                            <SelectItem value="pi_control">비례적분 제어 (PI)</SelectItem>
+                                                            <SelectItem value="pi_optimized">최적화 PI 제어</SelectItem>
+                                                        </>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    );
+                                }}
+                            />
+                            <div className="flex flex-col justify-end pb-1.5">
+                                <FormField
+                                    control={form.control}
+                                    name="emission.isCertified"
+                                    render={({ field }) => (
+                                        <FormItem className="flex items-center gap-2">
+                                            <FormControl><Switch checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
+                                            <FormLabel className="!m-0 cursor-pointer text-sm font-medium">제어기 인증 여부 (EN 15500-1)</FormLabel>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                            <FormField
+                                control={form.control}
+                                name="emission.roomAutomation"
+                                render={({ field }) => {
+                                    const controlType = form.watch("emission.controlType");
+                                    const pipingType = form.watch("emission.pipingType");
+                                    const isOnePipe = pipingType === "one_pipe" || pipingType === "one_pipe_improved";
+                                    const isAutomationDisabled = isOnePipe || controlType === "manual" || controlType === "central";
 
-                            return (
-                                <FormItem>
-                                    <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap">
-                                        실내 자동화 수준
-                                        <span className="text-[10.5px] text-violet-600 dark:text-violet-400 font-medium whitespace-nowrap">
-                                            (<InlineMath math={`\\Delta\\theta_{roomaut} = ${calculatedDeltas.aut >= 0 ? "+" : ""}${calculatedDeltas.aut.toFixed(1)}K`} />)
-                                        </span>
-                                    </FormLabel>
-                                    <Select 
-                                        onValueChange={field.onChange} 
-                                        value={isAutomationDisabled ? "none" : (field.value || "none")}
-                                        disabled={isAutomationDisabled}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="text-sm leading-tight px-2 h-10">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="none">자동화 없음</SelectItem>
-                                            <SelectItem value="time_control">시간 제어 (개별실)</SelectItem>
-                                            <SelectItem value="start_stop_optimized">단속 운전 최적화</SelectItem>
-                                            <SelectItem value="full_automation">통합 실내 자동화</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                            );
-                        }}
-                    />
+                                    return (
+                                        <FormItem>
+                                            <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap">
+                                                실내 자동화 수준
+                                                <span className="text-[10.5px] text-violet-600 dark:text-violet-400 font-medium whitespace-nowrap">
+                                                    (<InlineMath math={`\\Delta\\theta_{aut} = ${calculatedDeltas.aut >= 0 ? "+" : ""}${calculatedDeltas.aut.toFixed(1)}K`} />)
+                                                </span>
+                                            </FormLabel>
+                                            <Select 
+                                                onValueChange={field.onChange} 
+                                                value={isAutomationDisabled ? "none" : (field.value || "none")}
+                                                disabled={isAutomationDisabled}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger className="text-sm leading-tight px-2 h-10">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="none">자동화 없음</SelectItem>
+                                                    <SelectItem value="time_control">시간 제어 (개별실)</SelectItem>
+                                                    <SelectItem value="start_stop_optimized">단속 운전 최적화</SelectItem>
+                                                    <SelectItem value="full_automation">통합 실내 자동화</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    );
+                                }}
+                            />
+                        </div>
+                    )}
+
 
                     {/* 상세 항목 (바닥/벽면/천장 매립 난방 전용) */}
                     {(emissionType === "floor_heating" || emissionType === "wall_heating" || emissionType === "ceiling_heating") && (
@@ -866,25 +883,42 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                 <FormField
                                     control={form.control}
                                     name="emission.embeddingType"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap">
-                                                시공 (매립) 방식
-                                                <span className="text-[10.5px] font-medium whitespace-nowrap flex items-center gap-0.5">
-                                                    (<span className="text-orange-600 dark:text-orange-400"><InlineMath math={`\\Delta\\theta_{str} = ${calculatedDeltas.str_emb.toFixed(1)}K`} /></span>,
-                                                    <span className="text-rose-600 dark:text-rose-400 ml-1"><InlineMath math={`\\Delta\\theta_{emb,1} = ${calculatedDeltas.emb1.toFixed(1)}K`} /></span>)
-                                                </span>
-                                            </FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value || "wet"}>
-                                                <FormControl><SelectTrigger className="h-9 text-sm px-2 leading-tight"><SelectValue /></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="wet" className="text-sm">습식 (Wet)</SelectItem>
-                                                    <SelectItem value="dry" className="text-sm">건식 (Dry)</SelectItem>
-                                                    <SelectItem value="low_coverage" className="text-sm">낮은 피복 두께</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
-                                    )}
+                                    render={({ field }) => {
+                                        const isDisabled = emissionType !== "floor_heating";
+                                        let displayTypeLabel = "일반 방식";
+                                        if (emissionType === "wall_heating") displayTypeLabel = "벽면 매립 난방";
+                                        else if (emissionType === "ceiling_heating") displayTypeLabel = "천장 매립 난방";
+
+                                        return (
+                                            <FormItem>
+                                                <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap">
+                                                    시공 (매립) 방식
+                                                    <span className="text-[10.5px] font-medium whitespace-nowrap flex items-center gap-0.5">
+                                                        (<span className="text-orange-600 dark:text-orange-400"><InlineMath math={`\\Delta\\theta_{str} = ${calculatedDeltas.str_emb.toFixed(1)}K`} /></span>,
+                                                        <span className="text-rose-600 dark:text-rose-400 ml-1"><InlineMath math={`\\Delta\\theta_{emb,1} = ${calculatedDeltas.emb1.toFixed(1)}K`} /></span>)
+                                                    </span>
+                                                </FormLabel>
+                                                <Select 
+                                                    onValueChange={field.onChange} 
+                                                    value={isDisabled ? "none" : (field.value || "wet")}
+                                                    disabled={isDisabled}
+                                                >
+                                                    <FormControl><SelectTrigger className="h-9 text-sm px-2 leading-tight"><SelectValue /></SelectTrigger></FormControl>
+                                                    <SelectContent>
+                                                        {isDisabled ? (
+                                                            <SelectItem value="none" className="text-sm">{displayTypeLabel}</SelectItem>
+                                                        ) : (
+                                                            <>
+                                                                <SelectItem value="wet" className="text-sm">습식 (Wet)</SelectItem>
+                                                                <SelectItem value="dry" className="text-sm">건식 (Dry)</SelectItem>
+                                                                <SelectItem value="low_coverage" className="text-sm">낮은 피복 두께</SelectItem>
+                                                            </>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormItem>
+                                        );
+                                    }}
                                 />
                                 {emissionType !== "floor_heating" ? (
                                     <FormField
@@ -1060,6 +1094,50 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                     </div>
                                 );
                             })()}
+                        </div>
+                    )}
+                    {/* TABS 상세 파라미터 */}
+                    {emissionType === "tabs" && (
+                        <div className="col-span-2 mt-2">
+                            <div className="relative py-4">
+                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                    <div className="w-full border-t border-muted/80" />
+                                </div>
+                                <div className="relative flex justify-start">
+                                    <span className="bg-background pr-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 px-1 ml-1">
+                                        <div className="size-1.5 rounded-full bg-orange-500/50" />
+                                        TABS(구체 축열 시스템) 상세 파라미터
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="emission.tabsControlType"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap font-medium text-foreground">
+                                                TABS 제어 방식
+                                                <span className="text-[10.5px] font-medium whitespace-nowrap flex items-center gap-0.5">
+                                                    (<span className="text-orange-600 dark:text-orange-400"><InlineMath math={`\\Delta\\theta_{str} + \\Delta\\theta_{ctr} + \\Delta\\theta_{emb} = ${calculatedDeltas.str_emb.toFixed(1)}K`} /></span>)
+                                                </span>
+                                            </FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value || "constant_temp"}>
+                                                <FormControl>
+                                                    <SelectTrigger className="h-10 text-sm px-3 leading-tight transition-all hover:border-orange-200 focus:ring-orange-100 dark:hover:border-orange-900/40 dark:focus:ring-orange-950/30">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="constant_temp" className="text-sm">일정 공급온도 제어</SelectItem>
+                                                    <SelectItem value="central_or_electric" className="text-sm">중앙 공급온도 제어 또는 전기식 TABS</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
                         </div>
                     )}
                 </div>
