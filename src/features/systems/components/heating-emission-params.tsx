@@ -245,6 +245,8 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                     im = -0.3;
                     break;
                 case "floor_heating":
+                case "wall_heating":
+                case "ceiling_heating":
                     if (embType === "low_coverage") im = -0.2;
                     else if (embType === "dry") im = -0.15;
                     else im = 0;
@@ -314,28 +316,35 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
         isHall
     ]);
 
-    // 배관 방식 변경 시 수력 균형 옵션 유효성 체크 및 자동 전환
+    // 배관 방식 변경 시 수력 균형 옵션 유효성 체크 및 설계 온도 자동 보정
     useEffect(() => {
-        const currentBalancing = form.getValues("emission.hydraulicBalancing");
-        
+        const pipingType = form.getValues("emission.pipingType");
+        const currentHydraulic = form.getValues("emission.hydraulicBalancing");
+        const currentRegime = form.getValues("emission.temperatureRegime");
+
+        // 1. 수력 균형 자동 전환
         if (pipingType === "distributed") {
-            if (currentBalancing !== "none") {
+            if (currentHydraulic !== "none") {
                 form.setValue("emission.hydraulicBalancing", "none", { shouldDirty: true });
             }
         } else if (pipingType === "one_pipe" || pipingType === "one_pipe_improved") {
-            // 1관식 유효 옵션인지 확인
             const validOnePipeOptions = ["none", "static_loop", "dynamic_loop", "dynamic_return_temp", "dynamic_delta_temp"];
-            if (!validOnePipeOptions.includes(currentBalancing)) {
+            if (!validOnePipeOptions.includes(currentHydraulic)) {
                 form.setValue("emission.hydraulicBalancing", "none", { shouldDirty: true });
             }
         } else if (pipingType === "two_pipe") {
-            // 2관식 유효 옵션인지 확인 (기본값 static)
             const validTwoPipeOptions = ["none", "static", "static_group_static", "static_group_dynamic", "dynamic"];
-            if (!validTwoPipeOptions.includes(currentBalancing)) {
+            if (!validTwoPipeOptions.includes(currentHydraulic)) {
                 form.setValue("emission.hydraulicBalancing", "static", { shouldDirty: true });
             }
         }
-    }, [pipingType, form]);
+
+        // 2. 설계 온도 자동 보정 (독일 규정 표 14 준수)
+        // 기존 1관식(one_pipe)은 고온 옵션(90/70, 70/55)만 허용
+        if (pipingType === "one_pipe" && (currentRegime === "55/45" || currentRegime === "45/35")) {
+            form.setValue("emission.temperatureRegime", "70/55", { shouldDirty: true });
+        }
+    }, [form.watch("emission.pipingType")]);
 
     return (
         <div className="space-y-6">
@@ -438,7 +447,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                     name="emission.type"
                     render={({ field }) => (
                         <FormItem className={cn(
-                            (emissionType === "radiator" || emissionType === "convector" || emissionType === "fcu" || emissionType === "floor_heating" || emissionType === "electric_heater") ? "col-span-1" : "col-span-2"
+                            (emissionType === "radiator" || emissionType === "convector" || emissionType === "fcu" || emissionType === "floor_heating" || emissionType === "wall_heating" || emissionType === "ceiling_heating" || emissionType === "electric_heater") ? "col-span-1" : "col-span-2"
                         )}>
                             <FormLabel>방열 방식 (Emission Type)</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
@@ -472,7 +481,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                     )}
                 />
 
-                {(emissionType === "radiator" || emissionType === "convector" || emissionType === "fcu" || emissionType === "floor_heating" || emissionType === "electric_heater") && (
+                {(emissionType === "radiator" || emissionType === "convector" || emissionType === "fcu" || emissionType === "floor_heating" || emissionType === "wall_heating" || emissionType === "ceiling_heating" || emissionType === "electric_heater") && (
                     <FormField
                         control={form.control}
                         name="emission.isIntermittent"
@@ -481,8 +490,8 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                 <FormControl><Switch checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
                                 <FormLabel className="!m-0 pb-1 cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-sm font-medium">
                                     간헐 운전 실시 여부
-                                    <span className="text-[11px] text-cyan-600 dark:text-cyan-400 font-medium ml-1">
-                                        (<InlineMath math={`\\Delta\\theta_{im} = ${calculatedDeltas.im.toFixed(1)}K`} />)
+                                    <span className="text-[11px] text-cyan-700 dark:text-cyan-400 font-bold ml-1">
+                                        (<InlineMath math={`\\Delta\\theta_{im} = ${calculatedDeltas.im.toFixed(2)}K`} />)
                                     </span>
                                 </FormLabel>
                             </FormItem>
@@ -1007,7 +1016,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                 render={({ field }) => (
                                     <FormItem className="flex items-center gap-2 pt-6">
                                         <FormControl><Switch checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                                        <FormLabel className="!m-0 pb-1 cursor-pointer whitespace-nowrap">환기 설비 연동 (<InlineMath math="\Delta\\theta_{str}" /> 보정)</FormLabel>
+                                        <FormLabel className="!m-0 pb-1 cursor-pointer whitespace-nowrap text-sm font-medium">환기 설비/유인 유닛 연동 (<InlineMath math="\Delta\theta_{str}" /> 보정)</FormLabel>
                                     </FormItem>
                                 )}
                             />
@@ -1117,8 +1126,13 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                                 <SelectContent>
                                                     <SelectItem value="90/70" className="text-sm">90/70 (60K)</SelectItem>
                                                     <SelectItem value="70/55" className="text-sm">70/55 (42.5K)</SelectItem>
-                                                    <SelectItem value="55/45" className="text-sm">55/45 (30K)</SelectItem>
-                                                    <SelectItem value="45/35" className="text-sm">45/35 (20K)</SelectItem>
+                                                    {/* 기존 1관식(Einrohrnetz, nicht erneuert)은 저온 옵션 제외 (표 14) */}
+                                                    {form.watch("emission.pipingType") !== "one_pipe" && (
+                                                        <>
+                                                            <SelectItem value="55/45" className="text-sm">55/45 (30K)</SelectItem>
+                                                            <SelectItem value="45/35" className="text-sm">45/35 (20K)</SelectItem>
+                                                        </>
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                         </FormItem>
@@ -1130,7 +1144,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                     render={({ field }) => (
                                         <FormItem className="flex items-center gap-2 pt-6">
                                             <FormControl><Switch checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                                            <FormLabel className="!m-0 pb-1 cursor-pointer whitespace-nowrap">환기 설비 연동 (<InlineMath math="\Delta\theta_{str,1}" /> 보정)</FormLabel>
+                                            <FormLabel className="!m-0 pb-1 cursor-pointer whitespace-nowrap">환기 설비/유인 유닛 연동 (<InlineMath math="\Delta\theta_{str,1}" /> 보정)</FormLabel>
                                         </FormItem>
                                     )}
                                 />

@@ -187,7 +187,7 @@ function getStrDelta1(
     temperatureRegime: string,
     hasVentilationLink: boolean
 ): number {
-    // 환기 설비 연동 시 일괄 0.2 K (DIN/TS 18599-5 표 14 주석)
+    // 환기 설비/유인 유닛 연동 시 일괄 0.2 K (DIN/TS 18599-5 표 14 주석)
     if (hasVentilationLink) return 0.2;
 
     let base = 0.7; // 기본 편차값 초기화
@@ -530,13 +530,12 @@ function getIntermittentDelta(
         case 'fcu':
             return -0.3; // 6.2.2.4.2설 라디에이터/컨벡터 및 6.2.2.4.6절 FCU
         case 'floor_heating':
-            // 6.2.2.4.4절 표면 난방(바닥)의 간헐 운전 편차
-            if (embeddingType === 'low_coverage') return -0.2;
-            if (embeddingType === 'dry') return -0.15;
-            return 0; // 습식(wet) 등은 열용량이 커서 보상 없음
         case 'wall_heating':
         case 'ceiling_heating':
-            return 0; // 표 15에 따라 벽/천장 매립은 습식과 동일(=0K) 취급
+            // 6.2.2.4.4절 표면 난방(바닥, 벽, 천장)의 간헐 운전 편차
+            if (embeddingType === 'low_coverage') return -0.2;
+            if (embeddingType === 'dry') return -0.15;
+            return 0; // 습식(wet) 등은 열용량이 커서 보수적으로 0K 적용
         default:
             return 0;
     }
