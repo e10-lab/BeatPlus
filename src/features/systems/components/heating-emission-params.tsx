@@ -257,7 +257,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
             }
         }
 
-        // 8. 급기 난방 통합 편차 (Δθ_ce) - 표 17
+        // 8. 급기 재열기(코일) 통합 편차 (Δθ_ce) - 표 17
         let supplyAirDelta = 0;
         if (eType === "supply_air") {
             const ctrlVar = form.watch("emission.supplyAirControlVariable") || "room_temp";
@@ -461,7 +461,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                             <SelectItem value="wall_heating">벽면 매립 난방</SelectItem>
                                             <SelectItem value="ceiling_heating">천장 매립 난방</SelectItem>
                                             <SelectItem value="tabs">TABS (콘크리트코어 활성화)</SelectItem>
-                                            <SelectItem value="supply_air">급기 난방</SelectItem>
+                                            <SelectItem value="supply_air">급기 재열기(코일)</SelectItem>
                                             <SelectItem value="electric_heater">독립형 전기 난방기</SelectItem>
                                         </>
                                     )}
@@ -1230,13 +1230,13 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                 </div>
             )}
 
-            {/* 급기 난방 (Zuluftnachheizung) 상세 파라미터 */}
+            {/* 급기 재열기(코일) 상세 파라미터 */}
             {emissionType === "supply_air" && (
                 <div className="mt-2 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="relative flex items-center gap-3 py-4 mt-2">
                         <div className="size-1.5 rounded-full bg-blue-500/60" />
                         <span className="text-[13px] font-bold text-foreground/80 whitespace-nowrap">
-                            급기 난방(Zuluftnachheizung) 상세 파라미터
+                            급기 재열기(코일) 상세 파라미터
                         </span>
                         <div className="h-[1px] flex-1 bg-muted/50" />
                     </div>
@@ -1273,8 +1273,8 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                     <Select onValueChange={field.onChange} value={field.value || "low"}>
                                         <FormControl><SelectTrigger className="h-10 transition-all hover:border-cyan-200"><SelectValue /></SelectTrigger></FormControl>
                                         <SelectContent>
-                                            <SelectItem value="high">상 (High Quality)</SelectItem>
-                                            <SelectItem value="low">하 (Low Quality)</SelectItem>
+                                            <SelectItem value="high">상 (높음)</SelectItem>
+                                            <SelectItem value="low">하 (낮음)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormItem>

@@ -23,7 +23,7 @@ export type EmitterType =
     | 'floor_heating' | 'wall_heating' | 'ceiling_heating'
     // 표 16: 콘크리트코어 활성화
     | 'tabs'
-    // 표 17: 급기 난방
+    // 표 17: 급기 재열기(코일)
     | 'supply_air'
     // 표 18: 독립형 전기 난방기
     | 'electric_heater'
@@ -126,7 +126,7 @@ export interface EmissionLossInput {
     // TABS 제어 방식
     tabsControlType?: 'constant_temp' | 'central_or_electric';
 
-    // 급기 난방 제어 (표 17, 6.2.2.4.6절)
+    // 급기 재열기(코일) 제어 (표 17, 6.2.2.4.6절)
     supplyAirControlVariable?: 'room_temp' | 'room_temp_cascade' | 'exhaust_temp';
     supplyAirControlQuality?: 'low' | 'high';
 
@@ -589,7 +589,7 @@ function getRoomAutomationDelta(roomAutomation: RoomAutomation): number {
     }
 }
 
-// ─── 표 17: 급기 난방 통합 편차 (Δθ_str + Δθ_ctr + Δθ_emb) ───
+// ─── 표 17: 급기 재열기(코일) 통합 편차 (Δθ_str + Δθ_ctr + Δθ_emb) ───
 // 6.2.2.4.6절 Zuluftnachheizung (층고 ≤ 4m 비주거 공간)
 
 function getSupplyAirIntegratedDelta(
@@ -735,7 +735,7 @@ export function calculateEmissionLoss(input: EmissionLossInput): EmissionLossRes
         delta_theta_hydr = getHydraulicDelta(hydraulicBalancing, pipingType, emitterCount);
     }
 
-    // [신규] 급기 난방 (Zuluftnachheizung) 전용 통합 계산 (표 17, 6.2.2.4.6절)
+    // 급기 재열기(코일) 전용 통합 계산 (표 17, 6.2.2.4.6절)
     if (emitterType === 'supply_air') {
         const supplyAirDelta = getSupplyAirIntegratedDelta(
             input.supplyAirControlVariable || 'room_temp',
@@ -820,8 +820,8 @@ export function calculateEmissionLoss(input: EmissionLossInput): EmissionLossRes
             ...labels,
             control: `통합 처리됨`,
             embedding: `통합 처리됨`,
-            stratification: `급기 난방 표 17 (${ctrlVarLabel[input.supplyAirControlVariable || 'room_temp']}, 품질 ${qualLabel}) (${delta_theta_str.toFixed(1)}K)`,
-            automation: `급기 난방 - 해당 없음 (0.0K)`,
+            stratification: `급기 재열기(코일) 표 17 (${ctrlVarLabel[input.supplyAirControlVariable || 'room_temp']}, 품질 ${qualLabel}) (${delta_theta_str.toFixed(1)}K)`,
+            automation: `급기 재열기(코일) - 해당 없음 (0.0K)`,
             hydraulic: `공기 매질 - 해당 없음 (0.0K)`,
         };
     }
