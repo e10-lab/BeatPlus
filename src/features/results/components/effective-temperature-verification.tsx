@@ -1,29 +1,31 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { MonthlyResult } from "@/engine/types";
 import { Zone } from "@/types/project";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// Tabs removed
 import 'katex/dist/katex.min.css';
-import { InlineMath, BlockMath } from 'react-katex';
+import { InlineMath } from 'react-katex';
+import { formatNum } from "../utils/formatters";
+import { useVerificationState } from "../hooks/use-verification-state";
+import { VerificationSection, MonthSelector } from "./shared/verification-ui";
 
 interface EffectiveTemperatureVerificationProps {
     data: MonthlyResult[];
     title?: string;
     zone?: Zone;
+    selectedMonth?: number;
 }
 
-export function EffectiveTemperatureVerification({ data, title, zone }: EffectiveTemperatureVerificationProps) {
-    const [selectedMonth, setSelectedMonth] = useState<number>(data[0]?.month || 1);
-
+export function EffectiveTemperatureVerification({ data, title, zone, selectedMonth: externalMonth }: EffectiveTemperatureVerificationProps) {
+    const {
+        selectedMonth,
+        currentMonthData,
+        handleMonthChange
+    } = useVerificationState(data, { externalMonth });
 
     if (!data || data.length === 0) return <div className="p-4 text-center text-muted-foreground">데이터가 없습니다.</div>;
-
-    const currentMonthData = data.find(m => m.month === selectedMonth) || data[0];
 
     // 1. Time Constant Variables
     const Cm = currentMonthData.Cm || 0;
@@ -32,15 +34,7 @@ export function EffectiveTemperatureVerification({ data, title, zone }: Effectiv
     const H_tot = (currentMonthData.H_tot || (H_tr + H_ve));
     const tau = currentMonthData.tau_h || currentMonthData.tau || 0;
 
-    // Check manual calc of tau for verification
-    const tau_check = H_tot > 0 ? Cm / H_tot : 0;
-
-    // 2. Utilization Factors
-    const gamma = currentMonthData.gamma;
-    const a = currentMonthData.a_H;
-    const eta = currentMonthData.eta;
-
-    // 3. Setpoints and Reductions
+    // 2. Setpoints and Reductions
     const Theta_int_set = currentMonthData.Theta_int_H || 0;
 
     // Setback Factors
@@ -48,13 +42,10 @@ export function EffectiveTemperatureVerification({ data, title, zone }: Effectiv
     const f_we = currentMonthData.f_we || 0;
 
     // Reductions
-    const Delta_theta_NA = currentMonthData.Delta_theta_i_NA || 0;
     const delta_theta_EMS = currentMonthData.delta_theta_EMS || 0;
 
     // Final Effective Temp
     const Theta_i_real = currentMonthData.Theta_i_h || currentMonthData.avg_Ti || 0;
-
-    const formatNum = (val: number | undefined, decimals = 2) => val !== undefined ? val.toFixed(decimals) : "-";
 
     return (
         <TooltipProvider>
@@ -66,32 +57,15 @@ export function EffectiveTemperatureVerification({ data, title, zone }: Effectiv
                             DIN 18599-2에 따른 시정수(<InlineMath math="\tau" />), 이용효율(<InlineMath math="\eta" />), 그리고 최종 유효 온도(<InlineMath math="\theta_{i,eff}" />) 산출 과정
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-4">
-                        {/* Mode Toggle Removed */}
-
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">조회 월:</span>
-                            <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-                                <SelectTrigger className="w-[90px]">
-                                    <SelectValue placeholder="월 선택" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {data.map(m => (
-                                        <SelectItem key={m.month} value={m.month.toString()}>{m.month}월</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+                    <MonthSelector 
+                        months={data.map(m => m.month)} 
+                        value={selectedMonth} 
+                        onChange={handleMonthChange} 
+                    />
                 </CardHeader>
                 <CardContent className="space-y-8">
-
                     {/* Step 1: Time Constant */}
-                    <section className="space-y-4">
-                        <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
-                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono text-sm">Step 1</span>
-                            시정수 산정 (Time Constant, <InlineMath math="\tau" />)
-                        </h3>
+                    <VerificationSection step="Step 1" title="시정수 산정 (Time Constant, \tau)">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                                 <div className="text-xs text-slate-500 font-medium mb-1">유효 열용량 (<InlineMath math="C_m" />)</div>
@@ -113,14 +87,10 @@ export function EffectiveTemperatureVerification({ data, title, zone }: Effectiv
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </VerificationSection>
 
                     {/* Step 2: Setback Factors */}
-                    <section className="space-y-4">
-                        <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
-                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono text-sm">Step 2</span>
-                            감경 계수 (Setback Factors, <InlineMath math="f_{NA}, f_{we}" />)
-                        </h3>
+                    <VerificationSection step="Step 2" title="감경 계수 (Setback Factors, f_{NA}, f_{we})">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                                 <div className="flex justify-between items-start mb-2">
@@ -159,7 +129,6 @@ export function EffectiveTemperatureVerification({ data, title, zone }: Effectiv
                                         </div>
                                         <div className="text-xl font-bold">{formatNum(f_we, 3)}</div>
                                     </div>
-                                    {/* Empty placeholder to match height/layout if needed, or just kept for consistency structure */}
                                     <div className="text-right px-2 py-1 h-[38px]">
                                     </div>
                                 </div>
@@ -171,20 +140,11 @@ export function EffectiveTemperatureVerification({ data, title, zone }: Effectiv
                                     )}
                                 </div>
                             </div>
-
                         </div>
-                    </section>
+                    </VerificationSection>
 
-                    {/* Step 3: Effective Temperature (Heating & Cooling) */}
-                    <section className="space-y-6">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono text-sm">Step 3</span>
-                                유효 실내 온도 산정 (Effective Temperature)
-                            </h3>
-                        </div>
-
-                        {/* 3-1. Heating Effective Temperature */}
+                    {/* Step 3: Effective Temperature */}
+                    <VerificationSection step="Step 3" title="유효 실내 온도 산정 (Effective Temperature)">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Operation (Usage Days) */}
                             <div className="rounded-xl border bg-slate-50/50 p-5 flex flex-col h-full">
@@ -304,9 +264,7 @@ export function EffectiveTemperatureVerification({ data, title, zone }: Effectiv
                                 <InlineMath math="\theta_{i,c} = \theta_{int,C} - 2.0" />
                             </div>
                         </div>
-
-                    </section>
-
+                    </VerificationSection>
                 </CardContent>
             </Card>
         </TooltipProvider>

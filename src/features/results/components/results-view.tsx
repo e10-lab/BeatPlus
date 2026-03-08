@@ -28,7 +28,6 @@ import { BarChart3, Clock, Database, Search, Thermometer as ThermometerIcon, Zap
 
 // 분석 탭 컴포넌트 추가
 import { VerificationTable } from "./verification-table";
-import { SystemVerification } from "./system-verification";
 import { DataLineageDiagram } from "./data-lineage-diagram";
 
 
@@ -406,10 +405,9 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
             </div>
 
             <Tabs defaultValue="monthly" className="w-full">
-                <TabsList className={`grid w-full ${isTotal ? 'grid-cols-1' : 'grid-cols-4'} mb-4`}>
+                <TabsList className={`grid w-full ${isTotal ? 'grid-cols-1' : 'grid-cols-3'} mb-4`}>
                     <TabsTrigger value="monthly" className="gap-2"><Leaf className="h-4 w-4" /> 월별 분석 (Monthly)</TabsTrigger>
                     {!isTotal && <TabsTrigger value="verification" className="gap-2"><Search className="h-4 w-4" /> 상세 검증 (Details)</TabsTrigger>}
-                    {!isTotal && <TabsTrigger value="system" className="gap-2"><Settings2 className="h-4 w-4" /> 설비 검증 (Systems)</TabsTrigger>}
                     {!isTotal && <TabsTrigger value="lineage" className="gap-2"><Database className="h-4 w-4" /> 데이터 계보 (Lineage)</TabsTrigger>}
                 </TabsList>
 
@@ -521,10 +519,6 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                     <>
                         <TabsContent value="verification" className="space-y-6">
                             <VerificationTable data={monthlyData} />
-                        </TabsContent>
-
-                        <TabsContent value="system" className="space-y-6">
-                            <SystemVerification data={monthlyData} title={`${results.zones.find(z => z.zoneId === selectedZoneId)?.zoneName || '선택 존'} 설비 손실 상세 검증`} />
                         </TabsContent>
 
                         <TabsContent value="lineage" className="space-y-6">

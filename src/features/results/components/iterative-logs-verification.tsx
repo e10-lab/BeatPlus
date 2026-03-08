@@ -62,37 +62,11 @@ export function IterativeLogsVerification({
     return (
         <Card className="w-full">
             <CardHeader>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <CardTitle>{title || "반복 계산 수렴 이력 (Iterative Calculation Logs)"}</CardTitle>
-                        <CardDescription>
-                            DIN 18599-1:2025-10 Sec 5.2.4에 따른 난방/냉방 부하와 시스템 손실의 반복 계산 수렴 과정
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">조회 월:</span>
-                        <Select
-                            value={selectedMonth.toString()}
-                            onValueChange={(val) => {
-                                onMonthChange(parseInt(val));
-                                // Month change automatically resets step in parent if needed, 
-                                // but usually we keep it or reset it. 
-                                // Let's assume parent handles reset or we explicitly call it.
-                                onIterationSelect(null);
-                            }}
-                        >
-                            <SelectTrigger className="w-[100px]">
-                                <SelectValue placeholder="Month" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {data.map((m) => (
-                                    <SelectItem key={m.month} value={m.month.toString()}>
-                                        {m.month}월
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <div>
+                    <CardTitle>{title || "반복 계산 수렴 이력 (Iterative Calculation Logs)"}</CardTitle>
+                    <CardDescription>
+                        DIN 18599-1:2025-10 Sec 5.2.4에 따른 난방/냉방 부하와 시스템 손실의 반복 계산 수렴 과정
+                    </CardDescription>
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
