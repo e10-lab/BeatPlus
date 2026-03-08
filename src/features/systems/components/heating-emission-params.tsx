@@ -250,8 +250,7 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                     else im = 0;
                     break;
                 case "electric_heater":
-                    const hCtrl = form.watch("emission.electricHeaterControl") || "p";
-                    im = hCtrl !== "none" ? -0.3 : 0;
+                    im = -0.3;
                     break;
                 default:
                     im = 0;
@@ -279,15 +278,14 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
             const hCtrl = form.watch("emission.electricHeaterControl") || "p";
 
             if (hType === "direct") {
-                // 직접 난방 (Direct heating)
-                if (hCtrl === "none") electricDelta = 2.5;
-                else if (hCtrl === "p") electricDelta = (hPos === "exterior" ? 1.0 : 0.7);
-                else electricDelta = (hPos === "exterior" ? 0.4 : 0.2); // PI/PID
+                // 직접 난방기 (Direktheizgeräte)
+                if (hCtrl === "p") electricDelta = (hPos === "exterior" ? 1.1 : 1.5);
+                else electricDelta = (hPos === "exterior" ? 0.7 : 1.1); // PI
             } else {
-                // 축열식 난방 (Storage heating)
-                if (hCtrl === "none") electricDelta = 2.5;
-                else if (hCtrl === "p") electricDelta = 1.2;
-                else electricDelta = 1.0; // PI/PID
+                // 축열식 난방기 (Speicherheizgeräte)
+                if (hCtrl === "none") electricDelta = (hPos === "exterior" ? 2.7 : 3.1);
+                else if (hCtrl === "p") electricDelta = (hPos === "exterior" ? 1.5 : 1.9);
+                else electricDelta = (hPos === "exterior" ? 1.1 : 1.5); // PID
             }
         }
 
@@ -1318,8 +1316,8 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                     <Select onValueChange={field.onChange} value={field.value || "direct"}>
                                         <FormControl><SelectTrigger className="h-10 transition-all hover:border-yellow-200"><SelectValue /></SelectTrigger></FormControl>
                                         <SelectContent>
-                                            <SelectItem value="direct">직접 난방 (Direct)</SelectItem>
-                                            <SelectItem value="storage">축열식 난방 (Storage)</SelectItem>
+                                            <SelectItem value="direct">직접식 전기 난방기</SelectItem>
+                                            <SelectItem value="storage">축열식 전기 난방기</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormItem>
@@ -1341,23 +1339,38 @@ export function HeatingEmissionParams({ form, zones = [], isShared = true, linke
                                 </FormItem>
                             )}
                         />
-                                <FormField
-                                    control={form.control}
-                                    name="emission.electricHeaterControl"
-                                    render={({ field }) => (
-                                        <FormItem className="col-span-2">
-                                            <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap font-medium">제어 방식</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value || "p"}>
-                                                <FormControl><SelectTrigger className="h-10 transition-all hover:border-yellow-200"><SelectValue /></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="none">중앙 또는 수동 제어</SelectItem>
-                                                    <SelectItem value="p">비례 제어 (P)</SelectItem>
-                                                    <SelectItem value="pi">비례적분 제어 (PI/PID)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
-                                    )}
-                                />
+                        <FormField
+                            control={form.control}
+                            name="emission.electricHeaterControl"
+                            render={({ field }) => {
+                                const hType = form.watch("emission.electricHeaterType") || "direct";
+                                return (
+                                    <FormItem className="col-span-2">
+                                        <FormLabel className="flex items-center gap-1.5 text-[13px] whitespace-nowrap font-medium">제어 방식</FormLabel>
+                                        <Select 
+                                            onValueChange={field.onChange} 
+                                            value={hType === "direct" && field.value === "none" ? "p" : (field.value || "p")}
+                                        >
+                                            <FormControl><SelectTrigger className="h-10 transition-all hover:border-yellow-200"><SelectValue /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {hType === "direct" ? (
+                                                    <>
+                                                        <SelectItem value="p">P-제어기 (1 K)</SelectItem>
+                                                        <SelectItem value="pi">PI-제어기 (최적화 기능 포함)</SelectItem>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <SelectItem value="none">실내 온도 제어 없음; 외기 온도 연동 축열 및 방열 제어 없음</SelectItem>
+                                                        <SelectItem value="p">P-제어기 (1 K); 외기 온도 연동 축열 및 방열 제어 포함</SelectItem>
+                                                        <SelectItem value="pi">PID-제어기 (최적화 포함); 외기 온도 연동 축열 및 방열 제어 포함</SelectItem>
+                                                    </>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                );
+                            }}
+                        />
                         <div className="col-span-2 flex items-center gap-3 p-3 rounded-lg bg-yellow-50/50 border border-yellow-100/50 text-yellow-800 dark:bg-yellow-950/20 dark:border-yellow-900/30 dark:text-yellow-300">
                             <Zap className="size-5 shrink-0 text-yellow-500" />
                             <p className="text-[11.5px] leading-relaxed">
