@@ -124,6 +124,15 @@ export interface HeatingSystem extends SystemBase {
         roomAutomation?: "none" | "time_control" | "start_stop_optimized" | "full_automation";
         hasVentilationLink?: boolean;  // 환기 설비 연동 여부 (층화 편차 감경)
 
+        // ── 급기 난방 제어 (표 17, 6.2.2.4.6절) ──
+        supplyAirControlVariable?: "room_temp" | "room_temp_cascade" | "exhaust_temp";
+        supplyAirControlQuality?: "low" | "high";
+
+        // ── 독립형 전기 난방 (표 18, 6.2.2.4.7절) ──
+        electricHeaterType?: "direct" | "storage";
+        electricHeaterPosition?: "exterior" | "interior";
+        electricHeaterControl?: "none" | "p" | "pi" | "pid";
+
         // ── 기타 물리적 속성 ──
         fanPower?: number;             // 전력 (W)
         convectiveFraction?: number;   // 대류 비율 0~1
