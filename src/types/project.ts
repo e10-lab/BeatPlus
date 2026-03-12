@@ -89,7 +89,6 @@ export interface Zone {
         powerDensity?: number; // W/m² (Optional override)
         efficacy?: number; // lm/W (Optional override, default ~60)
     };
-    linkedLightingSystemId?: string; // Optional link to a shared LightingSystem
     orderIndex?: number;
     isExcluded?: boolean;
     linkedVentilationUnitIds?: string[]; // Reference to multiple VentilationUnits

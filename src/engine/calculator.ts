@@ -1,22 +1,7 @@
-import { DHWSystem, AHUSystem, HeatingSystem, CoolingSystem, LightingSystem, EnergyCarrier } from "@/types/system";
+import { BuildingSystem, EnergyCarrier } from "@/types/system";
 import { ZoneInput, CalculationResults, MonthlyResult, HourlyResult, ZoneResult, SurfaceHourlyResult, ClimateData } from "./types";
 import { Project, Construction } from "@/types/project";
 import { getClimateData, generateHourlyClimateData } from "./climate-data";
-import { calculateLightingDemand } from "./lighting-calc";
-import { calculateHourlyDHW } from "./dhw-calc";
-import { calculateHourlyHvac } from "./hvac-calc"; // 설비 계산은 월간 부하 기반으로 별도 처리 필요하지만, 기존 모듈 재활용 검토
-import { calculateMonthlyHeatingSystem } from "./systems/heating";
-import {
-    calculateMonthlyOperatingConditions,
-    type TemperatureRegime,
-    type EmissionType,
-    type OperatingMode,
-} from "./systems/heating-operating-conditions";
-import { calculateDistributionLoss } from "./systems/heating-distribution-loss";
-import { calculateEmissionLoss, type EmitterType as EmissionEmitterType } from "./systems/heating-emission-loss";
-import { calculateStorageLoss } from "./systems/heating-storage-loss";
-import { calculateDHWGenerationLoss, mapToDHWBoilerType } from "./systems/dhw-generation-loss";
-import { calculateDHWSystemLoss, type DHWPipeInsulation as DHWPipeInsulationType } from "./systems/dhw-system-loss";
 import { DIN_18599_PROFILES } from "@/lib/din-18599-profiles";
 import { PEF_FACTORS, CO2_FACTORS, calculateStandardN50, getFxDefault, AirTightnessCategory, ExposureCategory, getExposureCategory } from "@/lib/standard-values";
 
@@ -869,7 +854,9 @@ export function calculateEnergyDemand(
             delta_theta_hydr: weightedAvg('delta_theta_hydr'),
             delta_theta_roomaut: weightedAvg('delta_theta_roomaut'),
             f_hydr: weightedAvg('f_hydr'),
-            emissionLabels: activeZoneResults.find(z => z.data.Q_h_b > 0)?.data.emissionLabels || activeZoneResults[0].data.emissionLabels,
+            emissionLabels: activeZoneResults.length > 0 
+                ? (activeZoneResults.find(z => z.data.Q_h_b > 0)?.data.emissionLabels || activeZoneResults[0].data.emissionLabels)
+                : undefined,
 
             storageTransferDetails: activeZoneResults.length > 0 ? {
                 Cm: weightedAvgNested('storageTransferDetails', 'Cm'),
@@ -888,7 +875,7 @@ export function calculateEnergyDemand(
 
     // --- 태양광 발전 계산 (DIN 18599-9) ---
     // 월간법에서는 별도 모듈을 통해 계산하거나 간략화. 여기서는 PV 로직 간단히 포함.
-    const pvSystems = systems?.filter(s => s.type === "PV") as import("@/types/system").PVSystem[] | undefined;
+    const pvSystems = systems?.filter(s => s.type === "PV") as any[] | undefined;
 
     // 단순화를 위해 0 처리 (필요시 복구)
     const pvGen_kWh = 0;
@@ -1078,8 +1065,8 @@ export function calculateZoneMonthly(
     const hasATD = ventilationConfig?.hasALD ?? false;
 
     // 존별 기계환기 연결 상태 확인 (AHU 또는 개별 환기장치)
-    const dhwSystem = systems?.find(s => s.type === "DHW" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as DHWSystem | undefined;
-    const ahuSystem = systems?.find(s => s.type === "AHU" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as AHUSystem | undefined;
+    const dhwSystem = systems?.find(s => s.type === "DHW" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as any | undefined;
+    const ahuSystem = systems?.find(s => s.type === "AHU" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as any | undefined;
     const isVentUnit = !!(zone.linkedVentilationUnitIds && zone.linkedVentilationUnitIds.length > 0);
     const hasRealSystem = !!(ahuSystem || isVentUnit); // 실제 환기 설비가 연결되어 있는가?
     const isMechanicalMode = (ventilationConfig?.type === 'mechanical') || (zone.ventilationMode === 'mechanical' || zone.ventilationMode === 'balanced_mech');
@@ -1174,13 +1161,13 @@ export function calculateZoneMonthly(
     // [변경] 월간법 로직 재작성 (엄격한 DIN 18599-2 준수)
 
     // 준비: 조명, 급탕 시스템 찾기 (시스템 효율 적용은 나중에, 여기서는 부하만)
-    let lightingSystem = systems?.find(s => s.type === "LIGHTING" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as LightingSystem | undefined;
-    if (!lightingSystem && zone.linkedLightingSystemId) lightingSystem = systems?.find(s => s.id === zone.linkedLightingSystemId) as LightingSystem | undefined;
+    let lightingSystem = systems?.find(s => s.type === "LIGHTING" && (s.linkedZoneIds?.includes(zone.id || "") || s.isShared)) as any | undefined;
+    if (!lightingSystem) lightingSystem = systems?.find(s => s.type === "LIGHTING") as any | undefined;
 
     // [이동] 월간 루프에서 사용하기 위해 시스템 정의 미리 수행 (시스템 손실 계산용)
-    const heatingSystem = systems?.find(s => s.type === "HEATING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as HeatingSystem | undefined;
-    const coolingSystem = systems?.find(s => s.type === "COOLING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as CoolingSystem | undefined;
-    const dhwSystemForFinal = systems?.find(s => s.type === "DHW" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as DHWSystem | undefined;
+    const heatingSystem = systems?.find(s => s.type === "HEATING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as any | undefined;
+    const coolingSystem = systems?.find(s => s.type === "COOLING" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as any | undefined;
+    const dhwSystemForFinal = systems?.find(s => s.type === "DHW" && (s.isShared || s.linkedZoneIds?.includes(zone.id || ""))) as any | undefined;
 
 
     // 월별 결과 계산
@@ -1591,28 +1578,13 @@ export function calculateZoneMonthly(
         const Q_w_b_m = (profile.dhwDemand * Area) * daysUsage;
 
         // [Gap 2] 공유 모듈 호출 — DIN/TS 18599-8 식(30), 표 10, 표 12 기반
-        const dhwLossResult = calculateDHWSystemLoss({
-            area: Area,
-            isResidential,
-            daysUsage,
-            daysInMonth: daysInMonth_val,
-            Q_w_b: Q_w_b_m,
-            theta_i: Theta_int_H,
-            hasCirculation: dhwSystem?.distribution?.hasCirculation,
-            hasTimer: dhwSystem?.distribution?.hasTimer ?? false,
-            pipeInsulation: (dhwSystem?.distribution?.pipeInsulation as DHWPipeInsulationType) ?? 'none',
-            pipeLength: dhwSystem?.distribution?.pipeLength,
-            storageVolume: undefined, // 면적 기반 자동 추정
-            storageTemp: dhwSystem?.storage?.temperature,
-        });
+        const Q_w_d_op_m = 0;
+        const Q_w_s_op_m = 0;
+        const Q_w_s_non_op_m = 0;
+        const Q_w_s_total_m = 0;
+        const Q_I_w_m = 0;
 
-        const Q_w_d_op_m = dhwLossResult.Q_w_d_op;
-        const Q_w_s_op_m = dhwLossResult.Q_w_s_op;
-        const Q_w_s_non_op_m = dhwLossResult.Q_w_s_non_op;
-        const Q_w_s_total_m = Q_w_s_op_m + Q_w_s_non_op_m;
-        const Q_I_w_m = dhwLossResult.Q_I_w;
-
-        const { L_w_d, U_l_w_d, dT_pipe, theta_w_av, V_storage: V_s, q_w_s_day: q_w_s_day_Wh } = dhwLossResult.metadata;
+        const L_w_d = 0, U_l_w_d = 0, dT_pipe = 0, theta_w_av = 0, V_s = 0, q_w_s_day_Wh = 0;
         const theta_i = Theta_int_H;
 
         const Q_I_p_m = Q_occ_m;
@@ -2204,231 +2176,22 @@ export function calculateZoneMonthly(
 
             // --- 시스템 손실 업데이트 및 수렴 확인 ---
             let Q_h_sys_loss_new = 0;
-            let distDetailsH: import("./types").SystemLossBreakdown = { total: { hours: 0, dT: 0, Q_loss: 0 }, op: { hours: 0, dT: 0, Q_loss: 0 }, non_op: { hours: 0, dT: 0, Q_loss: 0 }, L: 0, U: 0 };
-            let storageDetailsH: import("./types").SystemLossBreakdown = { total: { hours: 0, dT: 0, Q_loss: 0 }, op: { hours: 0, dT: 0, Q_loss: 0 }, non_op: { hours: 0, dT: 0, Q_loss: 0 }, V_s: 0, k_s: 0 };
-            let distDetailsC: import("./types").SystemLossBreakdown = { total: { hours: 0, dT: 0, Q_loss: 0 }, op: { hours: 0, dT: 0, Q_loss: 0 }, non_op: { hours: 0, dT: 0, Q_loss: 0 }, L: 0, U: 0 };
-            let storageDetailsC: import("./types").SystemLossBreakdown = { total: { hours: 0, dT: 0, Q_loss: 0 }, op: { hours: 0, dT: 0, Q_loss: 0 }, non_op: { hours: 0, dT: 0, Q_loss: 0 }, V_s: 0, k_s: 0 };
+            let distDetailsH: any = null;
+            let storageDetailsH: any = null;
+            let distDetailsC: any = null;
+            let storageDetailsC: any = null;
 
-            // DIN/TS 18599-5 5장 운전 조건 산출 (β 연동 동적 온도/시간)
-            const opRegime = (heatingSystem?.distribution?.temperatureRegime || '55/45') as TemperatureRegime;
-            const opEmission = (heatingSystem?.emission?.type || 'radiator') as EmissionType;
-            const opMode = (heatingSystem?.distribution?.operatingMode || 'night_setback') as OperatingMode;
-            const Phi_h_max = heatingSystem?.generator?.capacity || 0;
-
-            let opConditions = calculateMonthlyOperatingConditions({
-                Q_h_b: Q_h_need,
-                Phi_h_max,
-                regime: opRegime,
-                emissionType: opEmission,
-                d_nutz: daysUsage,
-                d_we: d_we,
-                t_op_d: t_h_op_d,
-                operatingMode: opMode,
-                theta_i: Theta_int_H,
-            });
-
-            // β 연동 평균 운전 온도 (Phi_max 미입력 시 설계 온도 폴백)
-            let Theta_mean_H = opConditions.temperature.theta_HK_av;
-            if (Phi_h_max <= 0) {
-                const fallbackTemps: Record<string, number> = { '90/70': 80, '70/50': 60, '55/45': 50, '35/28': 31.5 };
-                Theta_mean_H = fallbackTemps[opRegime] || 50;
-                if (heatingSystem?.emission?.type === 'floor_heating') Theta_mean_H = 35;
-            }
-
-            // [Phase 3] 방열 손실 및 수력 계수 반영 후 난방 요구량
-            let Q_h_need_with_ce = Q_h_need;
-            let Q_h_ce = 0;
-            let emissionResult: ReturnType<typeof calculateEmissionLoss> | null = null;
-
-            if (Q_h_need > 0) {
-                // [Phase 3] DIN/TS 18599-5 6.1~6.2절 방열 손실 (Q_h,ce)
-                emissionResult = calculateEmissionLoss({
-                    Q_h_b: Q_h_need,
-                    theta_i: Theta_int_H,
-                    theta_e: Te_avg,
-                    spaceCategory: (heatingSystem?.emission as any)?.spaceCategory || 'standard',
-                    emitterType: (heatingSystem?.emission?.type || 'radiator') as EmissionEmitterType,
-                    pipingType: (heatingSystem?.emission as any)?.pipingType || 'two_pipe',
-                    radiatorPosition: (heatingSystem?.emission as any)?.radiatorPosition || 'exterior_wall_opaque',
-                    sunProtection: (heatingSystem?.emission as any)?.sunProtection ?? true,
-                    temperatureRegime: (() => {
-                        let val = heatingSystem?.emission?.designTempDiff;
-                        if (!val && ['radiator', 'convector', 'fcu'].includes((heatingSystem?.emission?.type as string) || 'radiator')) {
-                            val = "60";
-                        }
-                        if (val === "60") return "90/70";
-                        if (val === "42.5") return "70/50";
-                        if (val === "30") return "55/45";
-                        if (val === "20") return "35/28";
-                        return heatingSystem?.distribution?.temperatureRegime || '70/50';
-                    })(),
-                    controlType: (heatingSystem?.emission as any)?.controlType || 'p_control',
-                    isCertified: (heatingSystem?.emission as any)?.isCertified || false,
-                    hydraulicBalancing: (heatingSystem?.emission as any)?.hydraulicBalancing || 'static',
-                    emitterCount: (heatingSystem?.emission as any)?.emitterCount || 10,
-                    embeddingType: (heatingSystem?.emission as any)?.embeddingType || 'wet',
-                    floorInsulation: (heatingSystem?.emission as any)?.floorInsulation || 'standard',
-                    roomAutomation: (heatingSystem?.emission as any)?.roomAutomation || 'none',
-                    hasVentilationLink: (heatingSystem?.emission as any)?.hasVentilationLink || false,
-                    isIntermittent: (heatingSystem?.emission as any)?.isIntermittent ?? false,
-                    hallAirSubType: (heatingSystem?.emission as any)?.hallAirSubType || 'low_temp_horizontal',
-                    infraredSubType: (heatingSystem?.emission as any)?.infraredSubType || 'standard',
-                    ceilingPanelSubType: (heatingSystem?.emission as any)?.ceilingPanelSubType || 'standard',
-                    roomHeight: (() => {
-                        const configuredHeight = (heatingSystem?.emission as any)?.roomHeight;
-                        if (configuredHeight && configuredHeight > 0) return configuredHeight;
-
-                        if (!heatingSystem?.id || !allZones) return zone.height;
-                        let totalArea = 0;
-                        let areaHeightSum = 0;
-
-                        if (heatingSystem.linkedZoneIds && heatingSystem.linkedZoneIds.length > 0) {
-                            for (const zId of heatingSystem.linkedZoneIds) {
-                                const z = allZones.get(zId);
-                                if (z && !z.isExcluded) {
-                                    totalArea += z.area;
-                                    areaHeightSum += z.area * z.height;
-                                }
-                            }
-                        } else if (heatingSystem.isShared) {
-                            for (const z of allZones.values()) {
-                                if (!z.isExcluded) {
-                                    totalArea += z.area;
-                                    areaHeightSum += z.area * z.height;
-                                }
-                            }
-                        }
-
-                        return totalArea > 0 ? (areaHeightSum / totalArea) : zone.height;
-                    })(),
-                    tabsControlType: (heatingSystem?.emission as any)?.tabsControlType || 'constant_temp',
-                    supplyAirControlVariable: (heatingSystem?.emission as any)?.supplyAirControlVariable || 'room_temp',
-                    supplyAirControlQuality: (heatingSystem?.emission as any)?.supplyAirControlQuality || 'low',
-                    electricHeaterType: (heatingSystem?.emission as any)?.electricHeaterType || 'direct',
-                    electricHeaterPosition: (heatingSystem?.emission as any)?.electricHeaterPosition || 'exterior',
-                    electricHeaterControl: (heatingSystem?.emission as any)?.electricHeaterControl || 'p',
-                    hallFloorDepth: (heatingSystem?.emission as any)?.hallFloorDepth || 'shallow',
-                    hallFloorInsulation: (heatingSystem?.emission as any)?.hallFloorInsulation || 'min1',
-                    hallHeatingLoad: (() => {
-                        let configuredLoad = (heatingSystem?.emission as any)?.hallHeatingLoad;
-                        if (configuredLoad) return configuredLoad;
-                        // 미입력 시 설계 외기온도 기준 존 단위면적당 부하 자동 계산 p_h = P_h_max / A
-                        const P_h_max = (H_tr_curr + H_ve_curr) * (Theta_int_H - Te_min);
-                        return Math.max(10, P_h_max / Area);
-                    })(),
-                    radiationFactor: (heatingSystem?.emission as any)?.radiationFactor || 0.5,
-                });
-
-                // 방열 손실을 Q_h_need에 가산 + 수력 평형 계수 반영
-                Q_h_ce = emissionResult.Q_h_ce;
-                Q_h_need_with_ce = (Q_h_need + Q_h_ce) * emissionResult.f_hydr;
-
-                // [Phase 2-1] DIN/TS 18599-5 6.3절 배관 분배 손실 (물리 기반)
-                const distResult = calculateDistributionLoss({
-                    pipeLength: heatingSystem?.distribution?.pipeLength,
-                    pipeInsulation: (heatingSystem?.distribution?.pipeInsulation || 'basic') as any,
-                    buildingArea: Area,
-                    numFloors: 1,
-                    floorHeight: 3,
-                    theta_HK_av: Theta_mean_H,
-                    theta_ambient: 20,
-                    t_op: opConditions.time.t_op,
-                    t_non_op: opConditions.time.t_non_op,
-                    indoorPipeFraction: 0.8,
-                });
-
-                const Q_d_loss = distResult.Q_d_total * 1000; // kWh → Wh
-                const L_pipe = distResult.L_pipe;
-                const U_pipe = distResult.U_l;
-                const dT_pipe = distResult.dT_op;
-                const operatingHours = opConditions.time.t_h_rL;
-
-                // [Phase 4] DIN/TS 18599-5 6.4절 축열조 손실 (물리 기반)
-                const storageResult = calculateStorageLoss({
-                    V_s: heatingSystem?.storage?.volume || 0,
-                    theta_h_s: Theta_mean_H,
-                    storageLocation: 'unheated_space', // 기본: 비난방 공간 (13°C)
-                    sameRoomAsGenerator: true,          // 기본: 열원기와 같은 공간
-                    d_op_mth: daysInMonth,              // 난방 시즌 전체
-                });
-
-                const Q_s_loss = storageResult.Q_h_s * 1000; // kWh → Wh
-
-                Q_h_sys_loss_new = Q_d_loss + Q_s_loss;
-
-                distDetailsH = distResult.breakdown;
-                storageDetailsH = storageResult.breakdown;
-            }
+            // 설비 시스템 로직 삭제됨 (초기화 상태)
+            const Q_h_ce = 0;
+            const Q_h_need_with_ce = Q_h_need;
+            
+            const opConditions = {
+                beta: 0,
+                temperature: { theta_VL: 0, theta_RL: 0, theta_HK_av: 0 },
+                time: { t_h_rL: 0, t_op: 0, t_non_op: 0 },
+            };
+            const emissionResult: any = null;
             let Q_c_sys_loss_new = 0;
-            // distDetailsC 및 storageDetailsC는 위에서 선언됨
-
-            if (Q_c_need > 0) {
-                // 냉방 분배 기본값 (DIN V 18599-7 표 14)
-                // L_pipe = 10 + 0.01 * V_net [m]
-                let L_pipe = 0;
-                if (coolingSystem?.distribution?.pipeLength) {
-                    L_pipe = coolingSystem.distribution.pipeLength;
-                } else {
-                    // 체적 기반 기본 계산 (표 14)
-                    L_pipe = 10 + 0.01 * Volume;
-                }
-
-                // U_pipe 기본값 (표 14)
-                // 표준 단열: 0.45 - 0.65 W/mK. 0.45를 기준값으로 사용.
-                const U_pipe = coolingSystem?.distribution?.pipeInsulation === 'none' ? 0.65 : 0.45;
-
-                // dT 동적 계산
-                // 평균 냉방 온도: 6/12 -> 9 degC
-                // 주위 온도: 26 degC (또는 20?) -> 보통 실내 설정온도?
-                // Ti_c 사용 시 (약 26?), 단순화: 배관 위치에 따라 dT = 6K ~ 11K.
-                // 표준에서는 명시적 값 또는 계산을 권장.
-                const Theta_mean_C = 9;
-                const Theta_ambient_C = 20; // 실내 배관 경로 가정
-                const dT_pipe = Math.abs(Theta_ambient_C - Theta_mean_C); // 11K
-
-                const operatingHours = usageDuration * daysUsage;
-                const Q_d_loss_c = (L_pipe * U_pipe * dT_pipe * operatingHours); // Wh
-
-                // 2. 저장탱크 손실 (냉방 버퍼) - DIN 18599-7 효율법
-                // Q_c,s = Q_c,b * (1 - eta_c,s)
-                // 기본값 eta_c,s = 0.95 (수축열), 1.00 (빙축열/저장없음)
-                const eta_c_s = 0.95; // 수축열 기본값
-                // 냉방 수요가 있는 경우에만 적용 (Q_c_need는 kWh? 아니오, 일관성 있다면 여기서 Wh지만 확인 필요.
-                // Q_c_need는 위에서 (Q_gains - eta * Q_loss)로 계산됨 ... 잠시만
-                // 월간법에서 Q_c_b (수요)는 수지의 최종 결과임.
-                // 여기서 'Q_c_need' 변수가 수요를 담고 있음.
-                const Q_s_loss_c = Q_c_need * (1 - eta_c_s);
-
-                Q_c_sys_loss_new = Q_d_loss_c + Q_s_loss_c;
-
-                distDetailsC = {
-                    L: L_pipe,
-                    U: U_pipe,
-                    total: {
-                        hours: operatingHours,
-                        dT: dT_pipe,
-                        Q_loss: Q_d_loss_c / 1000
-                    },
-                    op: {
-                        hours: operatingHours,
-                        dT: dT_pipe,
-                        Q_loss: Q_d_loss_c / 1000
-                    },
-                    non_op: {
-                        hours: 0,
-                        dT: 0,
-                        Q_loss: 0
-                    }
-                };
-
-                storageDetailsC = {
-                    V_s: 0,
-                    k_s: 0,
-                    total: { hours: 0, dT: 0, Q_loss: Q_s_loss_c },
-                    op: { hours: 0, dT: 0, Q_loss: Q_s_loss_c },
-                    non_op: { hours: 0, dT: 0, Q_loss: 0 }
-                };
-            }
 
             const convergence = (Q_h_b_prev + Q_c_b_prev) > 0
                 ? Math.abs((Q_h_need + Q_c_need) - (Q_h_b_prev + Q_c_b_prev)) / (Q_h_b_prev + Q_c_b_prev)
@@ -2465,24 +2228,7 @@ export function calculateZoneMonthly(
             let heatingCo2 = 0;
             let heatingAux = 0;
             let heatingGenerationLoss = 0;
-            let heatingGenerationDetails: import("./types").SystemLossBreakdown = { total: { hours: t_duration, dT: 0, Q_loss: 0 }, op: { hours: t_duration, dT: 0, Q_loss: 0 }, non_op: { hours: 0, dT: 0, Q_loss: 0 } };
-
-            if (heatingSystem && Q_h_need > 0) {
-                const Q_outg = Q_h_need_with_ce + Q_I_sys_heating / 1000; // Q_outg: 방열손실+수력계수+시스템손실 포함 (kWh)
-                const heatResult = calculateMonthlyHeatingSystem(
-                    heatingSystem,
-                    Q_outg,
-                    Te_avg,
-                    t_duration,
-                    Phi_h_max > 0 ? opConditions.temperature.theta_HK_av : undefined
-                );
-                heatingFinalEnergy = heatResult.finalEnergy;
-                heatingPrimaryEnergy = heatResult.primaryEnergy;
-                heatingCo2 = heatResult.co2Emissions;
-                heatingAux = heatResult.auxiliaryEnergy;
-                heatingGenerationLoss = heatResult.generationLoss;
-                heatingGenerationDetails = heatResult.generationDetails;
-            }
+            let heatingGenerationDetails: any = null;
 
             if (iter < 10 && convergence >= 0.001) continue;
 
@@ -2801,42 +2547,8 @@ export function calculateZoneMonthly(
 
     const copC = coolingSystem ? (coolingSystem.generator.efficiency || 3.0) : 3.0;
 
-    // [Gap 1] DIN/TS 18599-8 급탕 발전 효율 — 가동/대기 분리 방식
-    let feD = 0;
-    if (dhwSystemForFinal && sumD > 0) {
-        const genType = dhwSystemForFinal.generator.type || 'boiler';
-        const isBoilerDHW = genType.includes('boiler') || genType === 'district';
-        const isHeatPumpDHW = genType === 'heat_pump' || genType === 'electric_heater';
-
-        if (isBoilerDHW) {
-            // 보일러 계열: DIN/TS 18599-8 가동/대기 분리 계산
-            const dhwBoilerType = mapToDHWBoilerType(genType, dhwSystemForFinal.generator.energyCarrier);
-            const totalDaysOp = monthlyResults.reduce((s, m) => s + ((m.hours ?? 0) / 24), 0);
-            const heatingDays = monthlyResults.reduce((s, m) => (m.Q_h_b > 0 ? s + ((m.hours ?? 0) / 24) : s), 0);
-            const dhwGenResult = calculateDHWGenerationLoss({
-                boilerType: dhwBoilerType,
-                P_n: dhwSystemForFinal.generator.capacity || 30,
-                eta_k_Pn: dhwSystemForFinal.generator.efficiency || 0.9,
-                Q_w_outg: sumD,
-                theta_s_av: dhwSystemForFinal.storage?.temperature ?? 55,
-                theta_l: 20,
-                d_op: totalDaysOp,
-                d_h_rB: heatingDays,
-            });
-            feD = dhwGenResult.Q_w_f;
-        } else if (isHeatPumpDHW) {
-            // 히트펌프: COP 기반 (DIN/TS 18599-12 단순화)
-            const copD = dhwSystemForFinal.generator.efficiency || 3.0;
-            feD = sumD / copD;
-        } else {
-            // 기타: 정수 효율
-            const copD = dhwSystemForFinal.generator.efficiency || 0.9;
-            feD = sumD / copD;
-        }
-    } else {
-        // 시스템 미정의 시 기본 효율
-        feD = sumD / 0.9;
-    }
+    // 설비 효율 초기화 (가정: 100% 효율)
+    let feD = sumD;
 
     // 에너지원별 PEF (Primary Energy Factor)
     const fuelC = coolingSystem?.generator.energyCarrier || 'electricity';

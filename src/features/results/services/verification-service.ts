@@ -1,6 +1,6 @@
 import { calculateZoneMonthly, processMonthlyWeather, MonthlyClimateIndices } from "@/engine/calculator";
 import { ZoneInput } from "@/engine/types";
-import { DHWSystem, LightingSystem, AHUSystem, HeatingSystem, CoolingSystem } from "@/types/system";
+import { BuildingSystem } from "@/types/system";
 import { DIN_18599_PROFILES } from "@/lib/din-18599-profiles";
 import { getClimateData } from "@/engine/climate-data";
 
@@ -88,34 +88,11 @@ export const runVerifications = (): VerificationResult[] => {
         const climate = getClimateData("Seoul");
 
         // Systems
-        const dhw: DHWSystem = {
-            id: "dhw1", name: "DHW", projectId: "test", isShared: false, type: "DHW",
-            generator: { type: "boiler", energyCarrier: "natural_gas", efficiency: 0.85 },
-            distribution: { hasCirculation: true, hasTimer: true, pipeInsulation: "good" }
-        };
-        const heating: HeatingSystem = {
-            id: "heat1", name: "Heat", projectId: "test", isShared: false, type: "HEATING",
-            generator: { type: "condensing_boiler", energyCarrier: "natural_gas", efficiency: 0.95 },
-            distribution: { temperatureRegime: "55/45", pumpControl: "prop_pressure" },
-            emission: { type: "radiator" }
-        };
-        const cooling: CoolingSystem = {
-            id: "cool1", name: "Cool", projectId: "test", isShared: false, type: "COOLING",
-            generator: { type: "compression_chiller", energyCarrier: "electricity", efficiency: 3.5 },
-            distribution: { type: "water" },
-            emission: { type: "fan_coil" }
-        };
-        // Correct AHU type based on src/types/system.ts
-        const ahu: AHUSystem = {
-            id: "ahu1", name: "AHU", projectId: "test", isShared: false, type: "AHU",
-            airflow: 1000,
-            heatRecovery: { type: "plate", heatingEfficiency: 0.75, coolingEfficiency: 0.75 },
-            fanPower: 1.5
-        };
-        const lighting: LightingSystem = {
-            id: "light1", name: "Light", projectId: "test", isShared: false, type: "LIGHTING",
-            lightingEfficacy: 80, controlType: "manual", hasConstantIlluminanceControl: false, parasiticPowerDensity: 0
-        };
+        const dhw = { id: "dhw1", name: "DHW", projectId: "test", isShared: true, type: "DHW" } as BuildingSystem;
+        const heating = { id: "heat1", name: "Heat", projectId: "test", isShared: true, type: "HEATING" } as BuildingSystem;
+        const cooling = { id: "cool1", name: "Cool", projectId: "test", isShared: true, type: "COOLING" } as BuildingSystem;
+        const ahu = { id: "ahu1", name: "AHU", projectId: "test", isShared: true, type: "AHU" } as BuildingSystem;
+        const lighting = { id: "light1", name: "Light", projectId: "test", isShared: true, type: "LIGHTING" } as BuildingSystem;
 
         // Note: ensure calculateZoneMonthly signature matches
         // zone: ZoneInput, monthlyIndices: MonthlyClimateIndices[], ... systems?: Project['systems']

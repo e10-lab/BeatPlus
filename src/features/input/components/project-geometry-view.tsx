@@ -1,7 +1,6 @@
 "use client";
 
-import { SystemGraphView } from "@/features/systems/components/system-graph-view";
-import { LayoutList, Network } from "lucide-react";
+import { LayoutList } from "lucide-react";
 import { useState } from "react";
 import { Zone } from "@/types/project";
 import { ZoneList } from "./zone-list";
@@ -29,9 +28,6 @@ import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BuildingSystem } from "@/types/system";
-import { SystemList } from "@/features/systems/components/system-list";
-import { SystemForm } from "@/features/systems/components/system-form";
-import { addSystem, updateSystem, deleteSystem } from "@/services/system-service";
 import { getZones } from "@/services/zone-service";
 import {
     Dialog,
@@ -48,19 +44,15 @@ interface ProjectGeometryViewProps {
 
 export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
     // ...
-    const [viewMode, setViewMode] = useState<"list" | "form" | "zone-detail" | "surface-form" | "system-form">("list");
+    const [viewMode, setViewMode] = useState<"list" | "form" | "zone-detail" | "surface-form">("list");
     const [selectedTab, setSelectedTab] = useState("zones");
     const [constructions, setConstructions] = useState<Construction[]>([]);
     const [projectStats, setProjectStats] = useState<ProjectStats>({ totalVolume: 0, totalEnvelopeArea: 0 });
     const [project, setProject] = useState<Project | null>(null);
     const [selectedZone, setSelectedZone] = useState<Zone | undefined>(undefined);
     const [selectedSurface, setSelectedSurface] = useState<any | undefined>(undefined);
-    const [selectedSystem, setSelectedSystem] = useState<BuildingSystem | undefined>(undefined);
     const [zones, setZones] = useState<Zone[]>([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    const [isSystemGraphMode, setIsSystemGraphMode] = useState(false);
-    const [deleteSystemConfirmOpen, setDeleteSystemConfirmOpen] = useState(false);
-    const [systemToDelete, setSystemToDelete] = useState<{ id: string; name: string } | null>(null);
 
     // Load Constructions on Mount
     useEffect(() => {
@@ -213,51 +205,6 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
         setConstructions(updatedList);
     };
 
-    // System Handlers
-    const handleAddSystem = () => {
-        setSelectedSystem(undefined);
-        setViewMode("system-form");
-    };
-
-    const handleEditSystem = (sys: BuildingSystem) => {
-        setSelectedSystem(sys);
-        setViewMode("system-form");
-    };
-
-    const handleDeleteSystemClick = (id: string) => {
-        const sys = project?.systems?.find(s => s.id === id);
-        if (sys) {
-            setSystemToDelete({ id, name: sys.name });
-            setDeleteSystemConfirmOpen(true);
-        }
-    };
-
-    const confirmDeleteSystem = async () => {
-        if (!systemToDelete) return;
-        try {
-            await deleteSystem(projectId, systemToDelete.id);
-            setDeleteSystemConfirmOpen(false);
-            setSystemToDelete(null);
-            loadProjectStats(); // Re-fetch project to update list
-        } catch (e) {
-            console.error("Failed to delete system:", e);
-            alert("삭제 실패");
-        }
-    };
-
-    const handleSystemSave = async (sys: BuildingSystem) => {
-        try {
-            if (selectedSystem) {
-                await updateSystem(projectId, sys);
-            } else {
-                await addSystem(projectId, sys);
-            }
-            setViewMode("list");
-            loadProjectStats(); // Refresh project
-        } catch (e) {
-            console.error("Failed to save system:", e);
-        }
-    };
 
 
 
@@ -266,7 +213,6 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
             <TabsList>
                 <TabsTrigger value="zones">존 관리 (Zones)</TabsTrigger>
                 <TabsTrigger value="constructions">외피 유형 (Assemblies)</TabsTrigger>
-                <TabsTrigger value="systems">설비 (Systems)</TabsTrigger>
             </TabsList>
 
             <TabsContent value="zones" className="space-y-4">
@@ -543,90 +489,6 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                 </Card>
             </TabsContent>
 
-            <TabsContent value="systems">
-                {viewMode === "system-form" ? (
-                    <div className="space-y-6 max-w-3xl mx-auto">
-                        <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className="mb-2">
-                            <ArrowLeft className="mr-2 h-4 w-4" /> 시스템 목록으로 돌아가기
-                        </Button>
-                        <SystemForm
-                            projectId={projectId}
-                            system={selectedSystem}
-                            zones={zones}
-                            onSave={handleSystemSave}
-                            onCancel={() => setViewMode("list")}
-                        />
-                    </div>
-                ) : (
-                    <>
-                        {/* Thermal Systems */}
-                        <Card className="mb-6">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <div className="space-y-1.5">
-                                    <CardTitle>열원 및 설비 시스템 (Thermal Systems)</CardTitle>
-                                    <CardDescription>
-                                        난방, 냉방, 급탕(DHW) 및 태양광 시스템을 정의하고 존과 연결합니다.
-                                    </CardDescription>
-                                </div>
-                                <div className="flex items-center gap-2 bg-muted p-1 rounded-md">
-                                    <Button
-                                        variant={!isSystemGraphMode ? "secondary" : "ghost"}
-                                        size="sm"
-                                        className="h-8 px-2"
-                                        onClick={() => setIsSystemGraphMode(false)}
-                                    >
-                                        <LayoutList className="h-4 w-4 mr-1" /> 목록
-                                    </Button>
-                                    <Button
-                                        variant={isSystemGraphMode ? "secondary" : "ghost"}
-                                        size="sm"
-                                        className="h-8 px-2"
-                                        onClick={() => setIsSystemGraphMode(true)}
-                                    >
-                                        <Network className="h-4 w-4 mr-1" /> 다이어그램
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {isSystemGraphMode ? (
-                                    <SystemGraphView
-                                        systems={project?.systems || []}
-                                        zones={zones}
-                                    />
-                                ) : (
-                                    <SystemList
-                                        projectId={projectId}
-                                        systems={project?.systems || []}
-                                        onAdd={handleAddSystem}
-                                        onEdit={handleEditSystem}
-                                        onDelete={handleDeleteSystemClick}
-                                    />
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Dialog open={deleteSystemConfirmOpen} onOpenChange={setDeleteSystemConfirmOpen}>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>설비 삭제 확인</DialogTitle>
-                                    <DialogDescription>
-                                        정말로 &apos;{systemToDelete?.name}&apos; 설비를 삭제하시겠습니까?
-                                        이 작업은 되돌릴 수 없으며 존에 연결된 설비 정보가 해제됩니다.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <DialogFooter className="gap-2 sm:gap-0">
-                                    <Button variant="outline" onClick={() => setDeleteSystemConfirmOpen(false)}>
-                                        취소
-                                    </Button>
-                                    <Button variant="destructive" onClick={confirmDeleteSystem}>
-                                        삭제
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    </>
-                )}
-            </TabsContent>
 
         </Tabs >
     );

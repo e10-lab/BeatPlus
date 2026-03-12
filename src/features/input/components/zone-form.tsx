@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Zone, ZoneUsageType, VentilationUnit, Project } from "@/types/project";
-import { BuildingSystem, LightingSystem } from "@/types/system";
+import { BuildingSystem } from "@/types/system";
 import { getSurfaces } from "@/services/surface-service";
 import { Surface } from "@/types/project";
 import { GeometricAnalysis } from "./geometric-analysis";
@@ -106,13 +106,11 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
             ventilationMode: zone?.ventilationMode || "natural",
             lightingPowerDensity: zone?.lighting?.powerDensity,
             lightingEfficacy: zone?.lighting?.efficacy ?? 60,
-            linkedLightingSystemId: zone?.linkedLightingSystemId || "none",
-            heatingReducedMode: zone?.heatingReducedMode || "setback",
             isMechanical: (zone?.linkedVentilationUnitIds || []).length > 0,
         },
     });
 
-    const lightingSystems = (systems || []).filter(s => s.type === "LIGHTING") as LightingSystem[];
+    const lightingSystems = (systems || []).filter(s => s.type === "LIGHTING");
 
     // const isMech = form.watch("isMechanical");
     // isMechanical 필드는 UI 로직에서 제거되었습니다. (자동 판단)
@@ -129,9 +127,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 thermalBridgeMode: zone.thermalBridgeMode || 0.10,
                 lightingEfficacy: zone.lighting?.efficacy || 60,
                 lightingPowerDensity: zone.lighting?.powerDensity || undefined,
-                linkedLightingSystemId: zone.linkedLightingSystemId || "none",
-                linkedVentilationUnitIds: zone.linkedVentilationUnitIds || [],
-                ventilationMode: zone.ventilationMode || "natural",
                 heatingReducedMode: zone.heatingReducedMode || "setback",
                 isMechanical: zone.ventilationMode !== "natural",
             });
@@ -146,9 +141,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 thermalBridgeMode: 0.10,
                 lightingEfficacy: 60,
                 lightingPowerDensity: undefined,
-                linkedLightingSystemId: "none",
-                linkedVentilationUnitIds: [],
-                ventilationMode: "natural",
                 heatingReducedMode: "setback",
                 isMechanical: false,
             });
@@ -180,7 +172,6 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 },
                 linkedVentilationUnitIds: values.linkedVentilationUnitIds || [],
                 ventilationMode: ((values.linkedVentilationUnitIds && values.linkedVentilationUnitIds.length > 0) ? "mechanical" : "natural") as "natural" | "mechanical" | "balanced_mech",
-                linkedLightingSystemId: values.linkedLightingSystemId === "none" ? undefined : values.linkedLightingSystemId,
                 heatingReducedMode: values.heatingReducedMode,
             };
 
@@ -597,7 +588,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                             <SelectItem value="none">개별 설정 사용 (Linked System 없음)</SelectItem>
                                             {lightingSystems.map((sys) => (
                                                 <SelectItem key={sys.id} value={sys.id}>
-                                                    {sys.name} (효율: {sys.lightingEfficacy} lm/W, {sys.controlType})
+                                                    {sys.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

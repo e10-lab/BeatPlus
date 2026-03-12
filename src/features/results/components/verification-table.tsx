@@ -14,6 +14,7 @@ import { EffectiveTemperatureVerification } from "./effective-temperature-verifi
 import { HeatBalanceVerification } from "./heat-balance-verification";
 import { EnergyDemandVerification } from "./energy-demand-verification";
 import { IterativeLogsVerification } from "./iterative-logs-verification";
+import { SystemVerification } from "./system-verification";
 
 interface VerificationTableProps {
     data: MonthlyResult[];
@@ -114,6 +115,7 @@ export function VerificationTable({ data, title, zone }: VerificationTableProps)
                             <TabsTrigger value="temp_verify" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all py-2 px-4 text-xs font-medium">유효 온도 (Temp)</TabsTrigger>
                             <TabsTrigger value="balance_verify" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all py-2 px-4 text-xs font-medium">열수지 분석 (Heat Balance)</TabsTrigger>
                             <TabsTrigger value="energy_demand" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all py-2 px-4 text-xs font-medium">에너지 요구량 (Demand)</TabsTrigger>
+                            <TabsTrigger value="system_verify" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all py-2 px-4 text-xs font-medium">설비 검증 (Systems)</TabsTrigger>
                             <TabsTrigger value="iteration_logs" className="data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all py-2 px-4 text-xs font-medium">반복 계산 (Iteration)</TabsTrigger>
                         </TabsList>
 
@@ -148,6 +150,10 @@ export function VerificationTable({ data, title, zone }: VerificationTableProps)
                                 selectedIterationStep={selectedIterationStep}
                                 onMonthChange={handleMonthChange}
                             />
+                        </TabsContent>
+
+                        <TabsContent value="system_verify">
+                            <SystemVerification data={data} />
                         </TabsContent>
 
                         <TabsContent value="iteration_logs">
