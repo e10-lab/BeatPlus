@@ -18,6 +18,7 @@ import { getConstructions } from "@/services/construction-service";
 import { useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { calculateStandardN50 } from "@/lib/standard-values";
+import { Latex } from "@/components/ui/latex";
 import { Label } from "@/components/ui/label";
 import { updateZone } from "@/services/zone-service";
 import { getProjectStats, getProject, updateProjectVentilation } from "@/services/project-service";
@@ -285,80 +286,95 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                                 <CardHeader>
                                     <CardTitle>외피 기밀성 및 침기 설정 (Air Tightness & Infiltration)</CardTitle>
                                     <CardDescription>
-                                        건물 전체의 기밀 등급과 침기율(n50)을 설정합니다. 기계 환기 설비가 있는 경우 더 엄격한 기밀성이 요구됩니다.
+                                        건물 전체의 기밀 등급과 적용 침기율(<Latex formula="n_{50}" />)을 설정합니다. 기계 환기 설비가 있는 경우 더 엄격한 기밀성이 요구됩니다.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                                         {/* Col 1: Category */}
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <Label>기밀 등급 (Category)</Label>
+                                        <div className="flex flex-col h-full">
+                                            <div className="flex items-center gap-2 mb-2 h-6">
+                                                <Label className="font-semibold text-slate-700">기밀 등급 (Category)</Label>
                                                 <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            <p>I: 기밀성 검증 완료</p>
-                                                            <p>II: 신축 건물 (표준)</p>
-                                                            <p>III: 기존 건물</p>
-                                                            <p>IV: 노후 건물</p>
+                                                            <div className="text-xs space-y-1">
+                                                                <p>I: 기밀성 검증 완료</p>
+                                                                <p>II: 신축 건물 (표준)</p>
+                                                                <p>III: 기존 건물</p>
+                                                                <p>IV: 노후 건물</p>
+                                                            </div>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
                                             </div>
-                                            <Select
-                                                value={project.ventilationConfig?.infiltrationCategory || "I"}
-                                                onValueChange={(val: "I" | "II" | "III" | "IV") => {
-                                                    // Determine mode based on AHU system presence
-                                                    const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
-                                                    const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
+                                            <div className="mt-auto">
+                                                <Select
+                                                    value={project.ventilationConfig?.infiltrationCategory || "I"}
+                                                    onValueChange={(val: "I" | "II" | "III" | "IV") => {
+                                                        const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
+                                                        const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
 
-                                                    const newN50 = project.ventilationConfig?.isMeasured
-                                                        ? project.ventilationConfig.n50
-                                                        : calculateStandardN50(
-                                                            projectStats.totalVolume,
-                                                            projectStats.totalEnvelopeArea,
-                                                            mode,
-                                                            val
-                                                        );
+                                                        const newN50 = project.ventilationConfig?.isMeasured
+                                                            ? project.ventilationConfig.n50
+                                                            : calculateStandardN50(
+                                                                projectStats.totalVolume,
+                                                                projectStats.totalEnvelopeArea,
+                                                                mode,
+                                                                val
+                                                            );
 
-                                                    const newConfig = {
-                                                        ...project.ventilationConfig!,
-                                                        infiltrationCategory: val,
-                                                        type: mode, // Update mode as well
-                                                        n50: newN50
-                                                    };
-                                                    updateProjectVentilation(projectId, newConfig).then(() => {
-                                                        loadProjectStats();
-                                                    });
-                                                }}
-                                            >
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="I">Category I (검증됨)</SelectItem>
-                                                    <SelectItem value="II">Category II (신축)</SelectItem>
-                                                    <SelectItem value="III">Category III (기존)</SelectItem>
-                                                    <SelectItem value="IV">Category IV (노후)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                                        const newConfig = {
+                                                            ...project.ventilationConfig!,
+                                                            infiltrationCategory: val,
+                                                            type: mode,
+                                                            n50: newN50
+                                                        };
+                                                        updateProjectVentilation(projectId, newConfig).then(() => {
+                                                            loadProjectStats();
+                                                        });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="I">Category I (검증됨)</SelectItem>
+                                                        <SelectItem value="II">Category II (신축)</SelectItem>
+                                                        <SelectItem value="III">Category III (기존)</SelectItem>
+                                                        <SelectItem value="IV">Category IV (노후)</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
                                         </div>
 
                                         {/* Col 2: n50 Result */}
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <Label>적용 침기율 (n50)</Label>
+                                        <div className="flex flex-col h-full">
+                                            <div className="flex items-center justify-between mb-2 h-6">
+                                                <div className="flex items-center gap-2">
+                                                    <Label className="font-semibold text-slate-700">적용 침기율 (<Latex formula="n_{50}" />)</Label>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <div className="text-xs max-w-[200px]">
+                                                                    건물 내외의 압력차가 50Pa일 때의 시간당 환기 횟수(<Latex formula="h^{-1}" />)를 나타냅니다.
+                                                                </div>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </div>
                                                 <div className="flex items-center space-x-2">
                                                     <Checkbox
                                                         id="n50-measured"
                                                         checked={project.ventilationConfig?.isMeasured || false}
                                                         onCheckedChange={(checked) => {
                                                             const isMeasured = checked === true;
-                                                            // Determine mode based on AHU system presence
                                                             const hasMechanical = (project.systems?.some(s => s.type === "AHU") ?? false);
                                                             const mode: "natural" | "mechanical" = hasMechanical ? "mechanical" : "natural";
-
                                                             const cat = project.ventilationConfig?.infiltrationCategory || "I";
 
                                                             const n50 = isMeasured
@@ -379,62 +395,85 @@ export function ProjectGeometryView({ projectId }: ProjectGeometryViewProps) {
                                                     />
                                                     <label
                                                         htmlFor="n50-measured"
-                                                        className="text-xs text-muted-foreground font-medium leading-none cursor-pointer"
+                                                        className="text-[11px] text-muted-foreground font-medium leading-none cursor-pointer"
                                                     >
                                                         직접 입력
                                                     </label>
                                                 </div>
                                             </div>
 
-                                            {project.ventilationConfig?.isMeasured ? (
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={project.ventilationConfig?.n50 || 0}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
-                                                        if (project) setProject({ ...project, ventilationConfig: { ...project.ventilationConfig!, n50: val } });
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
-                                                        const newConfig = { ...project.ventilationConfig!, n50: val, isMeasured: true };
-                                                        updateProjectVentilation(projectId, newConfig).then(() => loadProjectStats());
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="flex items-center justify-center p-2 bg-muted rounded-md border font-mono text-lg font-medium h-10">
-                                                    {(project.ventilationConfig?.n50 || 0).toFixed(2)} <span className="ml-1 text-sm text-muted-foreground">h⁻¹</span>
-                                                </div>
-                                            )}
+                                            <div className="mt-auto">
+                                                {project.ventilationConfig?.isMeasured ? (
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="h-10 text-center font-mono text-base"
+                                                        value={project.ventilationConfig?.n50 || 0}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value) || 0;
+                                                            if (project) setProject({ ...project, ventilationConfig: { ...project.ventilationConfig!, n50: val } });
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const val = parseFloat(e.target.value) || 0;
+                                                            const newConfig = { ...project.ventilationConfig!, n50: val, isMeasured: true };
+                                                            updateProjectVentilation(projectId, newConfig).then(() => loadProjectStats());
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center p-2 bg-slate-50/50 rounded-md border border-slate-200 font-mono text-lg font-bold text-slate-800 h-10 shadow-sm transition-all">
+                                                        {(project.ventilationConfig?.n50 || 0).toFixed(2)} <span className="ml-1 text-sm text-slate-400 font-normal">h⁻¹</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        {/* Col 3: ALD (Automatic for Mechanical, Manual for Natural) */}
-                                        <div className="space-y-4 pt-8">
-                                            <div className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id="has-ald"
-                                                    checked={project.ventilationConfig?.hasALD || false}
-                                                    disabled={project.ventilationConfig?.type === "mechanical"}
-                                                    onCheckedChange={(checked) => {
-                                                        const newConfig = {
-                                                            ...project.ventilationConfig!,
-                                                            hasALD: checked === true
-                                                        };
-                                                        updateProjectVentilation(projectId, newConfig);
-                                                    }}
-                                                />
-                                                <label
-                                                    htmlFor="has-ald"
-                                                    className="text-sm font-medium leading-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
-                                                >
-                                                    외부 공기 유입구 (ALD)
-                                                </label>
+                                        {/* Col 3: ALD Settings */}
+                                        <div className="flex flex-col h-full">
+                                            <div className="flex items-center gap-2 mb-2 h-6">
+                                                <Label className="font-semibold text-slate-700">추가 설정</Label>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <div className="text-xs max-w-[200px]">
+                                                                ALD(Outside Air Inlet)는 기밀한 공간의 안정적인 공기 도입을 위한 보조 장치 설정을 의미합니다.
+                                                            </div>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                             </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                {project.ventilationConfig?.type === "mechanical"
-                                                    ? "기계 환기 시 시스템 구성에 따라 자동 결정됩니다. (배기 전용: 켜짐, 급/배기: 꺼짐)"
-                                                    : "침기율 계산 시 ALD의 영향(f_ATD)을 고려합니다."}
-                                            </p>
+                                            <div className="mt-auto bg-slate-50/30 p-3 rounded-md border border-dashed border-slate-200 min-h-[70px] flex flex-col justify-center">
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id="has-ald"
+                                                        checked={project.ventilationConfig?.hasALD || false}
+                                                        onCheckedChange={(checked) => {
+                                                            const newConfig = {
+                                                                ...project.ventilationConfig!,
+                                                                hasALD: checked === true
+                                                            };
+                                                            updateProjectVentilation(projectId, newConfig).then(() => {
+                                                                loadProjectStats();
+                                                            });
+                                                        }}
+                                                    />
+                                                    <label
+                                                        htmlFor="has-ald"
+                                                        className="text-sm font-bold text-slate-800 leading-none cursor-pointer"
+                                                    >
+                                                        외부 공기 유입구 (ALD)
+                                                    </label>
+                                                </div>
+                                                <div className="mt-2 pl-6">
+                                                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                                                        {project.ventilationConfig?.type === "mechanical"
+                                                            ? "배기 시스템 구성 시 ALD를 통한 공기 유입을 고려합니다."
+                                                            : <span className="flex items-center gap-1 italic">침기율 계산 시 ALD의 영향(<Latex formula="f_{ATD}" />)을 고려합니다.</span>}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </CardContent>

@@ -7,7 +7,7 @@ import {
     Plus, Pencil, Trash2, Layers, Sun, Wind, Mountain, ArrowLeft
 } from "lucide-react";
 
-
+import { formatNum } from "@/features/results/utils/formatters";
 import { Construction } from "@/types/project";
 import { ConstructionForm } from "./construction-form";
 import { SurfaceIcon } from "@/components/ui/icons/surface-icon";
@@ -140,7 +140,7 @@ function SortableConstructionCard({ c, onEdit, onDelete }: SortableConstructionC
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
                         <div className="flex items-center gap-1 font-mono text-foreground">
-                            <span className="text-muted-foreground text-xs">U:</span> {c.uValue.toFixed(3)}
+                            <span className="text-muted-foreground text-xs">U:</span> {formatNum(c.uValue, 3)}
                         </div>
 
                         {/* SHGC for Window/Door */}
@@ -148,7 +148,7 @@ function SortableConstructionCard({ c, onEdit, onDelete }: SortableConstructionC
                             <div className="flex items-center gap-1 text-blue-600 font-medium text-xs">
                                 <span>SHGC:</span>
                                 <span>
-                                    {c.shgc !== undefined ? c.shgc : calculateSHGC(c.layers)}
+                                    {formatNum(c.shgc !== undefined ? c.shgc : calculateSHGC(c.layers), 3)}
                                 </span>
                             </div>
                         )}

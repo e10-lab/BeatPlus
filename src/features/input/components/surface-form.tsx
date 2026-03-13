@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Surface, SurfaceType, Orientation, Construction } from "@/types/project";
 import { createSurface, updateSurface } from "@/services/surface-service";
 import { getFxDefault } from "@/lib/standard-values";
+import { formatNum } from "@/features/results/utils/formatters";
 import { useState, useEffect } from "react";
 import { Loader2, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -341,7 +342,7 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, c
                                 <SelectContent>
                                     {filteredConstructions.map(c => (
                                         <SelectItem key={c.id} value={c.id}>
-                                            {c.name} (U={c.uValue})
+                                            {c.name} (U={formatNum(c.uValue, 3)})
                                         </SelectItem>
                                     ))}
                                     {filteredConstructions.length === 0 && (
@@ -384,14 +385,14 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, c
                                     <FormLabel>열관류율 (W/m²K)</FormLabel>
                                     {selectedConstructionId ? (
                                         <div className="px-3 py-2 bg-secondary/20 rounded-md text-sm font-medium text-foreground border border-transparent">
-                                            {field.value}
+                                            {formatNum(field.value, 3)}
                                         </div>
                                     ) : (
                                         <FormControl>
                                             <Input
                                                 type="number"
-                                                step="0.01"
-                                                placeholder="0.20"
+                                                step="0.001"
+                                                placeholder="0.200"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -456,7 +457,7 @@ export function SurfaceForm({ projectId, zoneId, surface, onSuccess, onCancel, c
                                         <FormLabel>일사취득계수 (SHGC)</FormLabel>
                                         {selectedConstructionId ? (
                                             <div className="px-3 py-2 bg-secondary/20 rounded-md text-sm font-medium text-foreground border border-transparent">
-                                                {field.value}
+                                                {formatNum(field.value, 3)}
                                             </div>
                                         ) : (
                                             <FormControl>

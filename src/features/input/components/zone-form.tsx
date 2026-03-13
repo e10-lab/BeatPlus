@@ -23,7 +23,7 @@ import { Surface } from "@/types/project";
 import { GeometricAnalysis } from "./geometric-analysis";
 import { createZone, updateZone } from "@/services/zone-service";
 import { useState, useEffect } from "react";
-import { Loader2, Info, Clock, Lightbulb, Thermometer, Wind, Fan, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Info, Clock, Lightbulb, Thermometer, Wind, Fan, Zap, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { DIN_18599_PROFILES, PROFILE_OPTIONS } from "@/lib/din-18599-profiles";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -58,14 +58,14 @@ const formSchema = z.object({
     area: z.coerce.number().min(0.1, { message: "면적은 0보다 커야 합니다." }),
     height: z.coerce.number().min(0.1, { message: "천정고는 0보다 커야 합니다." }),
     heatingTemp: z.coerce.number().default(20),
-    coolingTemp: z.number().min(10).max(35),
-    thermalBridgeMode: z.number().optional(),
+    coolingTemp: z.coerce.number().min(10).max(35),
+    thermalBridgeMode: z.coerce.number().optional(),
     linkedVentilationUnitIds: z.array(z.string()).optional(),
     ventilationMode: z.enum(["natural", "mechanical", "balanced_mech"]).optional(),
-    lightingPowerDensity: z.number().optional(),
-    lightingEfficacy: z.number().optional(),
+    lightingPowerDensity: z.coerce.number().optional(),
+    lightingEfficacy: z.coerce.number().optional(),
     linkedLightingSystemId: z.string().optional(),
-    heatingReducedMode: z.enum(["setback", "shutdown"]).default("setback"),
+    heatingReducedMode: z.enum(["continuous", "setback", "shutdown"]).default("continuous"),
     // UI 로직을 위해 추가됨
     isMechanical: z.boolean().optional(),
 });
@@ -99,8 +99,8 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
             usageType: zone?.usageType || "1_office",
             area: zone?.area || 0,
             height: zone?.height || 3.0,
-            heatingTemp: zone?.temperatureSetpoints.heating ?? 20,
-            coolingTemp: zone?.temperatureSetpoints.cooling ?? 26,
+            heatingTemp: zone?.temperatureSetpoints.heating ?? DIN_18599_PROFILES["1_office"].heatingSetpoint,
+            coolingTemp: zone?.temperatureSetpoints.cooling ?? DIN_18599_PROFILES["1_office"].coolingSetpoint,
             thermalBridgeMode: zone?.thermalBridgeMode ?? 0.10,
             linkedVentilationUnitIds: zone?.linkedVentilationUnitIds || [],
             ventilationMode: zone?.ventilationMode || "natural",
@@ -122,12 +122,12 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 usageType: zone.usageType || "1_office",
                 area: zone.area,
                 height: zone.height,
-                heatingTemp: zone.temperatureSetpoints?.heating || 20,
-                coolingTemp: zone.temperatureSetpoints?.cooling || 26,
+                heatingTemp: zone.temperatureSetpoints?.heating || DIN_18599_PROFILES["1_office"].heatingSetpoint,
+                coolingTemp: zone.temperatureSetpoints?.cooling || DIN_18599_PROFILES["1_office"].coolingSetpoint,
                 thermalBridgeMode: zone.thermalBridgeMode || 0.10,
                 lightingEfficacy: zone.lighting?.efficacy || 60,
                 lightingPowerDensity: zone.lighting?.powerDensity || undefined,
-                heatingReducedMode: zone.heatingReducedMode || "setback",
+                heatingReducedMode: zone.heatingReducedMode || "continuous",
                 isMechanical: zone.ventilationMode !== "natural",
             });
         } else {
@@ -136,12 +136,12 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                 usageType: "1_office",
                 area: 0,
                 height: 3.0,
-                heatingTemp: 20,
-                coolingTemp: 26,
+                heatingTemp: DIN_18599_PROFILES["1_office"].heatingSetpoint,
+                coolingTemp: DIN_18599_PROFILES["1_office"].coolingSetpoint,
                 thermalBridgeMode: 0.10,
                 lightingEfficacy: 60,
                 lightingPowerDensity: undefined,
-                heatingReducedMode: "setback",
+                heatingReducedMode: "continuous",
                 isMechanical: false,
             });
         }
@@ -232,7 +232,7 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="flex items-center gap-2">
-                                            용도 프로필 (DIN/TS 18599-10)
+                                            용도 프로필 (DIN/TS 18599-10:2025-10)
                                             {selectedProfile && (
                                                 <Dialog>
                                                     <DialogTrigger asChild>
@@ -443,7 +443,24 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                 name="heatingTemp"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>난방 설정 온도 (°C)</FormLabel>
+                                        <FormLabel className="flex items-center justify-between">
+                                            난방 설정 온도 (°C)
+                                            <Button 
+                                                type="button" 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-6 w-6 text-muted-foreground hover:text-orange-600"
+                                                onClick={() => {
+                                                    const usage = form.getValues("usageType");
+                                                    const profile = DIN_18599_PROFILES[usage as string];
+                                                    if (profile) {
+                                                        form.setValue("heatingTemp", profile.heatingSetpoint);
+                                                    }
+                                                }}
+                                            >
+                                                <RefreshCw className="h-3 w-3" />
+                                            </Button>
+                                        </FormLabel>
                                         <FormControl>
                                             <Input type="number" step="0.5" {...field} />
                                         </FormControl>
@@ -456,7 +473,24 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                 name="coolingTemp"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>냉방 설정 온도 (°C)</FormLabel>
+                                        <FormLabel className="flex items-center justify-between">
+                                            냉방 설정 온도 (°C)
+                                            <Button 
+                                                type="button" 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-6 w-6 text-muted-foreground hover:text-blue-600"
+                                                onClick={() => {
+                                                    const usage = form.getValues("usageType");
+                                                    const profile = DIN_18599_PROFILES[usage as string];
+                                                    if (profile) {
+                                                        form.setValue("coolingTemp", profile.coolingSetpoint);
+                                                    }
+                                                }}
+                                            >
+                                                <RefreshCw className="h-3 w-3" />
+                                            </Button>
+                                        </FormLabel>
                                         <FormControl>
                                             <Input type="number" step="0.5" {...field} />
                                         </FormControl>
@@ -481,19 +515,21 @@ export function ZoneForm({ projectId, zone, onSuccess, onCancel, projectStats, p
                                                     </TooltipTrigger>
                                                     <TooltipContent className="max-w-xs">
                                                         <p>야간 또는 주말 등 비사용 시간의 난방 운전 방식을 선택합니다.</p>
-                                                        <p className="mt-1"><b>저감 운전:</b> 온도를 낮추어 유지 (DIN 18599 식 28, 31)</p>
-                                                        <p><b>난방 정지:</b> 난방을 완전히 정지 (DIN 18599 식 29, 32)</p>
+                                                        <p className="mt-1"><b>일반 난방(연속 운전):</b> 비사용 시간에도 온도를 낮추지 않고 유지</p>
+                                                        <p><b>저감 운전:</b> 온도를 낮추어 유지 (DIN/TS 18599-2:2025-10 식 28, 31)</p>
+                                                        <p><b>난방 정지:</b> 난방을 완전히 정지 (DIN/TS 18599-2:2025-10 식 29, 32)</p>
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </TooltipProvider>
                                         </FormLabel>
                                         <FormControl>
                                             <Tabs
-                                                defaultValue={field.value}
+                                                value={field.value}
                                                 onValueChange={field.onChange}
                                                 className="w-full"
                                             >
-                                                <TabsList className="grid w-full grid-cols-2">
+                                                <TabsList className="grid w-full grid-cols-3">
+                                                    <TabsTrigger value="continuous">일반 난방</TabsTrigger>
                                                     <TabsTrigger value="setback">저감 운전</TabsTrigger>
                                                     <TabsTrigger value="shutdown">난방 정지</TabsTrigger>
                                                 </TabsList>

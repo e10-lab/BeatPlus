@@ -3,7 +3,7 @@
 import React from "react";
 import { MonthlyResult } from "@/engine/types";
 import { Flame, ThermometerSnowflake, Droplets, Zap } from "lucide-react";
-import { InlineMath } from "react-katex";
+import { Latex } from "@/components/ui/latex";
 import { formatNum } from "../../utils/formatters";
 import { VerificationSection } from "../shared/verification-ui";
 
@@ -40,7 +40,7 @@ export function SummarySection({
             <div className="text-2xl font-bold text-red-700">{formatNum(currentMonthData.Q_h_b)} <span className="text-sm font-normal">kWh/월</span></div>
           </div>
           <div className="text-[10px] text-red-400 mt-2 font-mono italic flex justify-between items-center">
-            <InlineMath math="Q_{h,b}" />
+            <Latex formula="Q_{h,b}" />
             <span className="text-[9px] opacity-70">Util: {formatNum(h?.eta, 3)}</span>
           </div>
         </div>
@@ -53,7 +53,7 @@ export function SummarySection({
             <div className="text-2xl font-bold text-blue-700">{formatNum(currentMonthData.Q_c_b)} <span className="text-sm font-normal">kWh/월</span></div>
           </div>
           <div className="text-[10px] text-blue-400 mt-2 font-mono italic flex justify-between items-center">
-            <InlineMath math="Q_{c,b}" />
+            <Latex formula="Q_{c,b}" />
             <span className="text-[9px] opacity-70">Util: {formatNum(c?.eta, 3)}</span>
           </div>
         </div>
@@ -66,7 +66,7 @@ export function SummarySection({
             <div className="text-2xl font-bold text-cyan-700">{formatNum(currentMonthData.Q_w_b)} <span className="text-sm font-normal">kWh/월</span></div>
           </div>
           <div className="text-[10px] text-cyan-400 mt-2 font-mono italic">
-            <InlineMath math="Q_{w,b}" />
+            <Latex formula="Q_{w,b}" />
           </div>
         </div>
         <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-100 flex flex-col justify-between">
@@ -78,7 +78,7 @@ export function SummarySection({
             <div className="text-2xl font-bold text-yellow-700">{formatNum(currentMonthData.Q_l_b)} <span className="text-sm font-normal">kWh/월</span></div>
           </div>
           <div className="text-[10px] text-yellow-500 mt-2 font-mono italic">
-            <InlineMath math="Q_{l,b}" />
+            <Latex formula="Q_{l,b}" />
           </div>
         </div>
       </div>

@@ -3,10 +3,12 @@
 import { ClimateData, HourlyClimate, MonthlyClimate } from "@/engine/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, ComposedChart, Area } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, BarChart, Bar, ComposedChart, Area } from "recharts";
 import { useMemo } from "react";
-import { Sun, Thermometer, Snowflake, Calculator } from "lucide-react";
+import { Sun, Thermometer, Snowflake, Calculator, HelpCircle } from "lucide-react";
 import { calculateSunPosition } from "@/engine/solar-calc";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Latex } from "@/components/ui/latex";
 
 interface ClimateAnalysisViewProps {
     weatherData: ClimateData;
@@ -56,9 +58,8 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
                 // Using 37.5 Latitude (Seoul) as default fallback if unknown.
                 if (altitude === 0 && h.I_beam > 0) {
                     const dayOfYear = Math.floor((h.hourOfYear - 1) / 24) + 1;
-                    // We don't have latitude in ClimateData, assuming Seoul (37.5) for now as it's the main dataset.
-                    // A better fix would be passing latitude in props.
-                    const pos = calculateSunPosition(dayOfYear, h.hour, 37.5);
+                    // We use the latitude from the weather data, falling back to 37.5 (Seoul) if missing.
+                    const pos = calculateSunPosition(dayOfYear, h.hour, weatherData.latitude || 37.5);
                     altitude = pos.altitude;
                 }
 
@@ -141,12 +142,32 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
     const annualCDD = monthlyStats.reduce((sum, m) => sum + m.cdd, 0);
 
     return (
+        <TooltipProvider>
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader className="p-4 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Calculator className="h-4 w-4" /> 연간 난방도일 (HDD 18°C)
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                                <Calculator className="h-4 w-4" /> 연간 난방도일 (HDD 18°C)
+                            </span>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <HelpCircle className="h-4 w-4 cursor-help text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[300px] p-3">
+                                    <div className="space-y-2">
+                                        <p className="font-bold border-b pb-1 text-red-600">난방도일 (Heating Degree Days)</p>
+                                        <p className="text-xs leading-relaxed">
+                                            난방이 필요한 정도를 나타내는 지표입니다. 기준 온도(18°C)와 일평균 외기 온도의 차이를 1년 동안 합산하여 계산합니다.
+                                        </p>
+                                        <div className="text-[11px] text-muted-foreground bg-muted p-2 rounded flex flex-col gap-1">
+                                            <span className="text-[10px] font-semibold">계산 공식:</span>
+                                            <Latex formula="\sum \max(0, 18.0 - T_e) / 24" className="text-red-700" />
+                                        </div>
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-0">
@@ -156,8 +177,27 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
                 </Card>
                 <Card>
                     <CardHeader className="p-4 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Calculator className="h-4 w-4" /> 연간 냉방도일 (CDD 24°C)
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                                <Calculator className="h-4 w-4" /> 연간 냉방도일 (CDD 24°C)
+                            </span>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <HelpCircle className="h-4 w-4 cursor-help text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[300px] p-3">
+                                    <div className="space-y-2">
+                                        <p className="font-bold border-b pb-1 text-blue-600">냉방도일 (Cooling Degree Days)</p>
+                                        <p className="text-xs leading-relaxed">
+                                            냉방이 필요한 정도를 나타내는 지표입니다. 일평균 외기 온도가 기준 온도(24°C)보다 높을 때 그 차이를 1년 동안 합산하여 계산합니다.
+                                        </p>
+                                        <div className="text-[11px] text-muted-foreground bg-muted p-2 rounded flex flex-col gap-1">
+                                            <span className="text-[10px] font-semibold">계산 공식:</span>
+                                            <Latex formula="\sum \max(0, T_e - 24.0) / 24" className="text-blue-700" />
+                                        </div>
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-0">
@@ -173,7 +213,7 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
                     </CardHeader>
                     <CardContent className="p-4 pt-0">
                         <div className="text-lg font-bold truncate">{weatherData.name}</div>
-                        <p className="text-xs text-muted-foreground mt-1">표준 기상 데이터 (TMY/EPW)</p>
+                        <p className="text-xs text-muted-foreground mt-1">표준 기상 데이터 (TMYx 2009-2023)</p>
                     </CardContent>
                 </Card>
             </div>
@@ -192,7 +232,7 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis fontSize={12} tickLine={false} axisLine={false} unit="°C" domain={['auto', 'auto']} />
-                                    <Tooltip
+                                    <ChartTooltip
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                     />
                                     <Legend />
@@ -219,7 +259,7 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis fontSize={12} tickLine={false} axisLine={false} unit=" kWh" />
-                                    <Tooltip
+                                    <ChartTooltip
                                         cursor={{ fill: '#f1f5f9' }}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                     />
@@ -245,7 +285,7 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                                    <Tooltip
+                                    <ChartTooltip
                                         cursor={{ fill: '#f1f5f9' }}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                     />
@@ -259,5 +299,6 @@ export function ClimateAnalysisView({ weatherData }: ClimateAnalysisViewProps) {
                 </Card>
             </div>
         </div>
+        </TooltipProvider>
     );
 }

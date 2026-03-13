@@ -12,7 +12,7 @@ export interface Project {
         zipCode?: string;
         latitude?: number;
         longitude?: number;
-        climateZone?: string; // DIN 18599 기후 구역 (예: "TRY 05")
+        climateZone?: string; // DIN/TS 18599:2025-10 기후 구역 (예: "TRY 05")
     };
     siteArea?: number; // 대지면적 (m²)
     buildingArea?: number; // 건축면적 (m²)
@@ -35,8 +35,8 @@ export interface Project {
         dailyOperationHours?: number; // t_v,mech: 기계환기 일일 운전시간 (기본 24h)
     };
     ventilationUnits?: VentilationUnit[];
-    automationConfig?: BuildingAutomationConfig; // DIN 18599-11
-    simulationMethod?: "monthly" | "hourly"; // "monthly": DIN 18599 Normal, "hourly": 5R1C (ISO 13790)
+    automationConfig?: BuildingAutomationConfig; // DIN/TS 18599-11:2025-10
+    simulationMethod?: "monthly" | "hourly"; // "monthly": DIN/TS 18599:2025-10 Normal, "hourly": 5R1C (ISO 13790)
     systems?: BuildingSystem[]; // Centralized list of all technical systems
 }
 
@@ -94,7 +94,7 @@ export interface Zone {
     linkedVentilationUnitIds?: string[]; // Reference to multiple VentilationUnits
     ventilationMode?: "natural" | "mechanical" | "balanced_mech"; // Explicit mode per zone
     thermalCapacitySpecific?: number; // Wh/(m²·K) - Specific Thermal Capacity
-    heatingReducedMode?: "setback" | "shutdown"; // 야간/주말 운전 모드 (저감/정지)
+    heatingReducedMode?: "continuous" | "setback" | "shutdown"; // 야간/주말 운전 모드 (연속/저감/정지)
     isPartialHeating?: boolean; // 6.1.2.4 공간적 부분 난방 (Teilbeheizung)
     partiallyHeatedAreaRatio?: number; // a_tb: 부분 난방 면적 비율 (0.0 - 1.0)
     partialHeatingLoadMax?: number; // Phi_h_max: 최대 난방 부하 밀도 (W/m², 선택 사항)
@@ -130,7 +130,7 @@ export interface Surface {
     tilt?: number; // Tilt angle (90=vertical, 0=horizontal)
 
     // 6.2.2 Transmission to Unheated Space
-    fx?: number; // Temperature Correction Factor (F_x), DIN V 18599-2. Default: 1.0 (outdoor) or 0.5 (unheated)
+    fx?: number; // Temperature Correction Factor (F_x), DIN/TS 18599-2:2025-10. Default: 1.0 (outdoor) or 0.5 (unheated)
 
     // 6.2.3 Transmission to Adjacent Zone
     adjacentZoneId?: string; // ID of adjacent zone (if applicable)

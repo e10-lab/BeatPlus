@@ -111,7 +111,7 @@ export interface HourlyResult {
 
 export interface MonthlyResult {
     month: number;
-    // 시간별 데이터로부터 집계됨 (DIN 18599 탭 이름 준수)
+    // 시간별 데이터로부터 집계됨 (DIN/TS 18599:2025-10 탭 이름 준수)
     Q_h_b: number; // kWh (Heating Demand)
     Q_c_b: number; // kWh (Cooling Demand)
     Q_l_b: number; // kWh (Lighting Demand)
@@ -173,9 +173,19 @@ export interface MonthlyResult {
     Delta_n_win_mech_0?: number;
     n_inf?: number;
     n_win?: number;
+    n_win_non_op?: number;
+    n_win_non_op_v2?: number;
     n_mech?: number;
+    n_mech_non_op?: number;
     heatRecoveryEff?: number;
     isForcedMech?: number;
+
+    // Daily Mean Physical Rates (for Time Constant / Heat Transfer Verification)
+    n_inf_op_phys?: number;
+    n_inf_non_op_phys?: number;
+    n_win_op_phys?: number;
+    n_win_non_op_phys?: number;
+    n_mech_op_phys?: number;
 
     n50?: number;
     f_wind?: number;
@@ -224,12 +234,32 @@ export interface MonthlyResult {
     QS_non_op_opaque?: number;
     QI_non_op?: number;
 
+    QI_details_op?: {
+        Q_I_p: number;
+        Q_I_l: number;
+        Q_I_fac: number;
+        Q_I_goods: number;
+        Q_I_w: number;
+        Q_l_b: number;
+        Q_w_b: number;
+    };
+    QI_details_non_op?: {
+        Q_I_p: number;
+        Q_I_l: number;
+        Q_I_fac: number;
+        Q_I_goods: number;
+        Q_I_w: number;
+        Q_l_b: number;
+        Q_w_b: number;
+    };
+
     warnings?: string[];
     balanceDetails?: {
         Cm: number;
         cooling: number;
     };
 
+    // 환기 상세
     H_tr?: number;
     H_ve?: number;
     hours?: number;
@@ -273,9 +303,18 @@ export interface MonthlyResult {
     H_ve_inf?: number;
     H_ve_win?: number;
     H_ve_mech?: number;
+    H_ve_op?: number;
+    H_ve_non_op?: number;
+    V_hve_op?: number;
+    V_hve_non_op?: number;
     H_ve_gross?: number;
     H_ve_tau_h?: number;
     H_ve_tau_c?: number;
+    H_tr_tau?: number;
+    H_ve_tau_h_op?: number;
+    H_ve_tau_h_non_op?: number;
+    H_ve_tau_c_op?: number;
+    H_ve_tau_c_non_op?: number;
 
     // [New] Systems & Load
     heatingLoadDetails?: {
@@ -349,7 +388,7 @@ export interface MonthlyResult {
         };
     };
 
-    // DIN 18599-5 Emission
+    // DIN/TS 18599-5:2025-10 Emission
     theta_HK_av?: number;
     theta_VL?: number;
     theta_RL?: number;

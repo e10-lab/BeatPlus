@@ -44,7 +44,7 @@ export function VerificationTable({ data, title, zone }: VerificationTableProps)
             <Card className="w-full overflow-hidden">
                 <CardHeader>
                     <CardTitle>{title || "상세 검증 데이터 (Verification Data)"}</CardTitle>
-                    <CardDescription>ISO 13790 / DIN 18599 상세 계산 변수 (사용/비사용 구분 포함)</CardDescription>
+                    <CardDescription>ISO 13790 / DIN/TS 18599:2025-10 상세 계산 변수 (사용/비사용 구분 포함)</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 p-4 bg-muted/30 rounded-lg border border-muted/50">

@@ -6,6 +6,8 @@ import { Zone } from "@/types/project";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { VerificationSection } from "./shared/verification-ui";
+import { Latex } from "@/components/ui/latex";
+import { formatNum } from "../utils/formatters";
 
 interface HeatTransferVerificationProps {
     data: MonthlyResult[];
@@ -14,11 +16,6 @@ interface HeatTransferVerificationProps {
 
 export function HeatTransferVerification({ data, zone }: HeatTransferVerificationProps) {
     if (!data || data.length === 0) return null;
-
-    const formatNum = (num: number | undefined, decimals: number = 2) => {
-        if (num === undefined || isNaN(num)) return "-";
-        return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    };
 
     const getAvg = (arr: any[], key: string) =>
         arr.length > 0 ? arr.reduce((sum, d) => sum + (d[key] || 0), 0) / arr.length : 0;
@@ -33,18 +30,21 @@ export function HeatTransferVerification({ data, zone }: HeatTransferVerificatio
     return (
         <div className="space-y-6">
             {/* 1. Transmission Summary */}
-            <VerificationSection title="1. 관류 열전달계수 상세 (Transmission H_tr Breakdown)" description="외피 유형별/방위별 열전달계수 산정 근거 (고정값 기준)">
+            <VerificationSection 
+                title={<>1. 관류 열전달계수 상세 (Transmission <Latex formula="H_{tr}" /> Breakdown)</>} 
+                description="외피 유형별/방위별 열전달계수 산정 근거 (고정값 기준)"
+            >
                 <Table className="text-xs">
                     <TableHeader>
                         <TableRow className="bg-orange-50/50">
                             <TableHead className="w-[150px]">부위 (Surface)</TableHead>
-                            <TableHead className="text-right">면적 A (m²)</TableHead>
-                            <TableHead className="text-right">열관류율 U (W/m²K)</TableHead>
-                            <TableHead className="text-right">보정계수 f_x (-)</TableHead>
-                            <TableHead className="text-right">ΔU_WB (W/m²K)</TableHead>
-                            <TableHead className="text-right">H_surf (W/K)</TableHead>
-                            <TableHead className="text-right">H_bridge (W/K)</TableHead>
-                            <TableHead className="text-right font-bold border-l">H_tr (W/K)</TableHead>
+                            <TableHead className="text-right">면적 <Latex formula="A" /> (m²)</TableHead>
+                            <TableHead className="text-right">열관류율 <Latex formula="U" /> (W/m²K)</TableHead>
+                            <TableHead className="text-right">보정계수 <Latex formula="f_x" /> (-)</TableHead>
+                            <TableHead className="text-right"><Latex formula="\Delta U_{WB}" /> (W/m²K)</TableHead>
+                            <TableHead className="text-right"><Latex formula="H_{surf}" /> (W/K)</TableHead>
+                            <TableHead className="text-right"><Latex formula="H_{bridge}" /> (W/K)</TableHead>
+                            <TableHead className="text-right font-bold border-l"><Latex formula="H_{tr}" /> (W/K)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -54,8 +54,8 @@ export function HeatTransferVerification({ data, zone }: HeatTransferVerificatio
                                 <TableRow key={key} className="hover:bg-slate-50/50">
                                     <TableCell className="font-medium text-slate-700">{surf.name}</TableCell>
                                     <TableCell className="text-right font-mono">{formatNum(surf.area, 1)}</TableCell>
-                                    <TableCell className="text-right font-mono text-slate-500">{formatNum(surf.uValue, 2)}</TableCell>
-                                    <TableCell className="text-right font-mono text-slate-500">{formatNum(surf.fx, 2)}</TableCell>
+                                    <TableCell className="text-right font-mono text-slate-500">{formatNum(surf.uValue, 3)}</TableCell>
+                                    <TableCell className="text-right font-mono text-slate-500">{formatNum(surf.fx, 3)}</TableCell>
                                     <TableCell className="text-right font-mono text-slate-400 italic">+{formatNum(surf.delta_U_WB || 0, 3)}</TableCell>
                                     <TableCell className="text-right font-mono text-slate-500">{formatNum(surf.H_tr, 1)}</TableCell>
                                     <TableCell className="text-right font-mono text-slate-400">{formatNum(surf.H_bridge, 1)}</TableCell>
@@ -63,16 +63,26 @@ export function HeatTransferVerification({ data, zone }: HeatTransferVerificatio
                                 </TableRow>
                             );
                         })}
-                        <TableRow className="bg-slate-50 font-bold border-t-2">
-                            <TableCell colSpan={7} className="text-right">합계 Σ H_tr (Transmission)</TableCell>
-                            <TableCell className="text-right font-mono text-orange-700 text-sm border-l">{formatNum(currentMonthDataRaw.H_tr_total, 1)}</TableCell>
+                        <TableRow className="bg-indigo-50/30 font-bold">
+                            <TableCell colSpan={7} className="text-right text-indigo-700">합계 <Latex formula="\Sigma H_{tr,\tau}" /> (Time Constant)</TableCell>
+                            <TableCell className="text-right font-mono text-indigo-700 text-sm border-l">
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger>{formatNum(currentMonthDataRaw.H_tr_tau, 1)}</TooltipTrigger>
+                                        <TooltipContent className="text-[10px]">내부 부재 Fx=0.5 보정 반영 (DIN 18599-2)</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
             </VerificationSection>
 
             {/* 2. Ventilation Summary */}
-            <VerificationSection title="2. 환기 열전달계수 상세 (Ventilation H_ve Breakdown)" description="난방/냉방 모드별 열전달계수 및 주요 인자 (연간 평균값)">
+            <VerificationSection 
+                title={<>2. 환기 열전달계수 상세 (Ventilation <Latex formula="H_{ve}" /> Breakdown)</>} 
+                description="난방/냉방 모드별 열전달계수 및 주요 인자 (연간 평균값)"
+            >
                 <div className="space-y-8">
                     {/* 2.0. 공통 기본 입력값 */}
                     <div className="space-y-3">
@@ -81,18 +91,18 @@ export function HeatTransferVerification({ data, zone }: HeatTransferVerificatio
                             <TableHeader>
                                 <TableRow className="bg-gray-50/80">
                                     <TableHead className="w-[110px]">구분</TableHead>
-                                    <TableHead className="text-right">A_NGF (m²)</TableHead>
-                                    <TableHead className="text-right">h_R (m)</TableHead>
-                                    <TableHead className="text-right">V (m³)</TableHead>
-                                    <TableHead className="text-right">V̇_A (m³/hm²)</TableHead>
-                                    <TableHead className="text-right">n_nutz (1/h)</TableHead>
-                                    <TableHead className="text-right">n_50 (1/h)</TableHead>
-                                    <TableHead className="text-right">f_ATD (-)</TableHead>
-                                    <TableHead className="text-right">n_SUP (1/h)</TableHead>
-                                    <TableHead className="text-right">n_ETA (1/h)</TableHead>
-                                    <TableHead className="text-right">η_rec (%)</TableHead>
-                                    <TableHead className="text-right">t_V,m (h/d)</TableHead>
-                                    <TableHead className="text-right">t_nutz (h/d)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="A_{NGF}" /> (m²)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="h_R" /> (m)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="V" /> (m³)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="\dot{V}_A" /> (m³/hm²)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="n_{nutz}" /> (1/h)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="n_{50}" /> (1/h)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="f_{ATD}" /> (-)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="n_{SUP}" /> (1/h)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="n_{ETA}" /> (1/h)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="\eta_{rec}" /> (%)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="t_{V,m}" /> (h/d)</TableHead>
+                                    <TableHead className="text-right"><Latex formula="t_{nutz}" /> (h/d)</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -132,7 +142,7 @@ export function HeatTransferVerification({ data, zone }: HeatTransferVerificatio
 
                     {/* 2.1~2.3 통합 상세 */}
                     <div className="space-y-3">
-                        <h3 className="font-bold text-sm text-green-700">2.1~2.3 환기 산정 통합 상세</h3>
+                        <h3 className="font-bold text-sm text-green-700">2.1~2.3 환기 산정 통합 상세 [v3.3]</h3>
                         <Table className="text-xs border">
                             <TableHeader>
                                 <TableRow className="bg-green-50/50">
@@ -140,49 +150,79 @@ export function HeatTransferVerification({ data, zone }: HeatTransferVerificatio
                                     <TableHead className="text-center border-l bg-amber-50/30" colSpan={3}>2.1 침기 (Infiltration)</TableHead>
                                     <TableHead className="text-center border-l bg-sky-50/30" colSpan={4}>2.2 창문환기 (Window)</TableHead>
                                     <TableHead className="text-center border-l bg-violet-50/30" colSpan={1}>2.3 기계환기</TableHead>
-                                    <TableHead rowSpan={2} className="text-right font-bold text-blue-700 bg-blue-50/20 align-bottom">H_ve,τ (W/K)</TableHead>
+                                    <TableHead rowSpan={2} className="text-right font-bold text-blue-700 bg-blue-50/20 align-bottom">
+                                        <div className="flex flex-col items-end">
+                                            <span><Latex formula="H_{ve,\tau}" /></span>
+                                            <span className="text-[10px] font-normal text-slate-400">Physical Daily (W/K)</span>
+                                        </div>
+                                    </TableHead>
                                 </TableRow>
                                 <TableRow className="bg-green-50/30">
-                                    <TableHead className="text-right border-l bg-amber-50/20">f_e</TableHead>
-                                    <TableHead className="text-right bg-amber-50/20">n_inf</TableHead>
-                                    <TableHead className="text-right bg-amber-50/20">f_e</TableHead>
-                                    <TableHead className="text-right border-l bg-sky-50/20">n_win,min</TableHead>
-                                    <TableHead className="text-right bg-sky-50/20">Δn_win</TableHead>
-                                    <TableHead className="text-right bg-sky-50/20">Δn_win,m</TableHead>
-                                    <TableHead className="text-right bg-sky-50/20">n_win</TableHead>
-                                    <TableHead className="text-right border-l bg-violet-50/20">n_mech</TableHead>
+                                    <TableHead className="text-right border-l bg-amber-50/20"><Latex formula="f_e" /></TableHead>
+                                    <TableHead className="text-right bg-amber-50/20"><Latex formula="n_{inf}" /></TableHead>
+                                    <TableHead className="text-right bg-amber-50/20"><Latex formula="e" /></TableHead>
+                                    <TableHead className="text-right border-l bg-sky-50/20"><Latex formula="n_{win,min}" /></TableHead>
+                                    <TableHead className="text-right bg-sky-50/20"><Latex formula="\Delta n_{win}" /></TableHead>
+                                    <TableHead className="text-right bg-sky-50/20"><Latex formula="\Delta n_{win,m}" /></TableHead>
+                                    <TableHead className="text-right bg-sky-50/20"><Latex formula="n_{win}" /></TableHead>
+                                    <TableHead className="text-right border-l bg-violet-50/20"><Latex formula="n_{mech}" /></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell className="font-bold text-red-600">난방</TableCell>
+                                    <TableCell className="font-bold text-red-600">난방 (Usage)</TableCell>
                                     <TableCell className="text-right border-l">{formatNum(getAvg(hData, 'f_e'), 2)}</TableCell>
-                                    <TableCell className="text-right font-bold text-amber-700">{formatNum(getAvg(hData, 'n_inf'), 3)}</TableCell>
-                                    <TableCell className="text-right">-</TableCell>
+                                    <TableCell className="text-right font-bold text-amber-700">{formatNum(getAvg(hData, 'n_inf_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(hData, 'e_shield'), 3)}</TableCell>
                                     <TableCell className="text-right border-l">{formatNum(getAvg(hData, 'n_win_min'), 2)}</TableCell>
                                     <TableCell className="text-right">{formatNum(getAvg(hData, 'Delta_n_win'), 3)}</TableCell>
                                     <TableCell className="text-right">{formatNum(getAvg(hData, 'Delta_n_win_mech'), 3)}</TableCell>
-                                    <TableCell className="text-right font-bold text-sky-700">{formatNum(getAvg(hData, 'n_win'), 3)}</TableCell>
-                                    <TableCell className="text-right border-l font-bold text-violet-700">{formatNum(getAvg(hData, 'n_mech'), 3)}</TableCell>
-                                    <TableCell className="text-right font-bold text-blue-700 bg-blue-50/10">{formatNum(getAvg(hData, 'H_ve_tau_h'), 1)}</TableCell>
+                                    <TableCell className="text-right font-bold text-sky-700">{formatNum(getAvg(hData, 'n_win_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right border-l font-bold text-violet-700">{formatNum(getAvg(hData, 'n_mech_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right font-bold text-blue-700 bg-blue-50/10">
+                                        <div className="flex flex-col items-end">
+                                            <span>{formatNum(getAvg(hData, 'H_ve_tau_h_op'), 1)}</span>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-bold text-blue-600">냉방</TableCell>
+                                    <TableCell className="font-bold text-slate-500">난방 (Non-Op)</TableCell>
+                                    <TableCell className="text-right border-l">{formatNum(getAvg(hData, 'f_e'), 2)}</TableCell>
+                                    <TableCell className="text-right font-bold text-amber-700">{formatNum(getAvg(hData, 'n_inf_non_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(hData, 'e_shield'), 3)}</TableCell>
+                                    <TableCell className="text-right border-l">{formatNum(getAvg(hData, 'n_win_min'), 2)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(hData, 'Delta_n_win'), 3)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(hData, 'Delta_n_win_mech'), 3)}</TableCell>
+                                    <TableCell className="text-right font-bold text-sky-700">{formatNum(getAvg(hData, 'n_win_non_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right border-l font-bold text-violet-700">{formatNum(getAvg(hData, 'n_mech_non_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right font-bold text-slate-500 bg-slate-50/10">
+                                        <div className="flex flex-col items-end">
+                                            <span>{formatNum(getAvg(hData, 'H_ve_tau_h_non_op'), 1)}</span>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-bold text-blue-600">냉방 (Usage)</TableCell>
                                     <TableCell className="text-right border-l">{formatNum(getAvg(cData, 'f_e'), 2)}</TableCell>
-                                    <TableCell className="text-right font-bold text-amber-700">{formatNum(getAvg(cData, 'n_inf'), 3)}</TableCell>
-                                    <TableCell className="text-right">-</TableCell>
+                                    <TableCell className="text-right font-bold text-amber-700">{formatNum(getAvg(cData, 'n_inf_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(cData, 'e_shield'), 3)}</TableCell>
                                     <TableCell className="text-right border-l">{formatNum(getAvg(cData, 'n_win_min'), 2)}</TableCell>
                                     <TableCell className="text-right">{formatNum(getAvg(cData, 'Delta_n_win'), 3)}</TableCell>
                                     <TableCell className="text-right">{formatNum(getAvg(cData, 'Delta_n_win_mech'), 3)}</TableCell>
-                                    <TableCell className="text-right font-bold text-sky-700">{formatNum(getAvg(cData, 'n_win'), 3)}</TableCell>
-                                    <TableCell className="text-right border-l font-bold text-violet-700">{formatNum(getAvg(cData, 'n_mech'), 3)}</TableCell>
-                                    <TableCell className="text-right font-bold text-blue-700 bg-blue-50/10">{formatNum(getAvg(cData, 'H_ve_tau_c'), 1)}</TableCell>
+                                    <TableCell className="text-right font-bold text-sky-700">{formatNum(getAvg(cData, 'n_win_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right border-l font-bold text-violet-700">{formatNum(getAvg(cData, 'n_mech_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right font-bold text-blue-700 bg-blue-50/10">
+                                        <div className="flex flex-col items-end">
+                                            <span>{formatNum(getAvg(cData, 'H_ve_tau_c_op'), 1)}</span>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </div>
                 </div>
             </VerificationSection>
+
         </div>
     );
 }

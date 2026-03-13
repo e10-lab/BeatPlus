@@ -3,6 +3,7 @@
 
 import React from "react";
 import { MonthlyResult, IterationLog } from "@/engine/types";
+import { formatNum } from "../utils/formatters";
 import {
     Card,
     CardContent,
@@ -27,8 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { InlineMath } from "react-katex";
-import "katex/dist/katex.min.css";
+import { Latex } from "@/components/ui/latex";
 import { cn } from "@/lib/utils";
 
 interface IterativeLogsVerificationProps {
@@ -51,13 +51,7 @@ export function IterativeLogsVerification({
     const currentMonthData = data.find((m) => m.month === selectedMonth) || data[0];
     const logs = currentMonthData.iterationLogs || [];
 
-    const formatNum = (num: number | undefined, decimals: number = 2) => {
-        if (num === undefined || num === null || isNaN(num)) return "-";
-        return num.toLocaleString(undefined, {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals,
-        });
-    };
+
 
     return (
         <Card className="w-full">
@@ -76,16 +70,16 @@ export function IterativeLogsVerification({
                             <TableRow>
                                 <TableHead className="w-[80px] text-center">Step</TableHead>
                                 <TableHead className="text-right">
-                                    난방요구량 <br /> (<InlineMath math="Q_{h,b}" />)
+                                    난방요구량 <br /> (<Latex formula="Q_{h,b}" />)
                                 </TableHead>
                                 <TableHead className="text-right">
-                                    냉방요구량 <br /> (<InlineMath math="Q_{c,b}" />)
+                                    냉방요구량 <br /> (<Latex formula="Q_{c,b}" />)
                                 </TableHead>
                                 <TableHead className="text-right text-orange-600">
-                                    시스템 손실 → 획득 <br /> (<InlineMath math="Q_{I,sys,h}" />)
+                                    시스템 손실 → 획득 <br /> (<Latex formula="Q_{I,sys,h}" />)
                                 </TableHead>
                                 <TableHead className="text-right text-blue-600">
-                                    시스템 손실 → 제거 <br /> (<InlineMath math="Q_{I,sys,c}" />)
+                                    시스템 손실 → 제거 <br /> (<Latex formula="Q_{I,sys,c}" />)
                                 </TableHead>
                                 <TableHead className="text-right">
                                     수렴도 <br /> (Convergence)
@@ -159,19 +153,19 @@ export function IterativeLogsVerification({
                                             <Table className="text-sm">
                                                 <TableBody>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">관류 열손실 (<InlineMath math="Q_T" />)</TableCell>
+                                                        <TableCell className="font-medium">관류 열손실 (<Latex formula="Q_T" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.QT, 2)} kWh</TableCell>
                                                     </TableRow>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">환기 열손실 (<InlineMath math="Q_V" />)</TableCell>
+                                                        <TableCell className="font-medium">환기 열손실 (<Latex formula="Q_V" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.QV, 2)} kWh</TableCell>
                                                     </TableRow>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">일사 열취득 (<InlineMath math="Q_S" />)</TableCell>
+                                                        <TableCell className="font-medium">일사 열취득 (<Latex formula="Q_S" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.QS, 2)} kWh</TableCell>
                                                     </TableRow>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">내부 발열 (<InlineMath math="Q_I" />)</TableCell>
+                                                        <TableCell className="font-medium">내부 발열 (<Latex formula="Q_I" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.QI, 2)} kWh</TableCell>
                                                     </TableRow>
                                                 </TableBody>
@@ -189,37 +183,37 @@ export function IterativeLogsVerification({
                                             <Table className="text-sm">
                                                 <TableBody>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">난방 이용 효율 (<InlineMath math="\eta_h" />)</TableCell>
+                                                        <TableCell className="font-medium">난방 이용 효율 (<Latex formula="\eta_h" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.eta_h, 4)}</TableCell>
                                                     </TableRow>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">냉방 이용 효율 (<InlineMath math="\eta_c" />)</TableCell>
+                                                        <TableCell className="font-medium">냉방 이용 효율 (<Latex formula="\eta_c" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.eta_c, 4)}</TableCell>
                                                     </TableRow>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">이득/손실 비 (<InlineMath math="\gamma_h" />)</TableCell>
+                                                        <TableCell className="font-medium">이득/손실 비 (<Latex formula="\gamma_h" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.gamma_h, 4)}</TableCell>
                                                     </TableRow>
                                                     <TableRow>
-                                                        <TableCell className="font-medium">손실/이득 비 (<InlineMath math="\gamma_c" />)</TableCell>
+                                                        <TableCell className="font-medium">손실/이득 비 (<Latex formula="\gamma_c" />)</TableCell>
                                                         <TableCell className="text-right">{formatNum(log.details.gamma_c, 4)}</TableCell>
                                                     </TableRow>
                                                     {/* Only show node temperatures if they exist */}
                                                     {log.theta_air !== undefined && (
                                                         <TableRow className="bg-muted/30">
-                                                            <TableCell className="font-medium">공기 온도 (<InlineMath math="\theta_{air}" />)</TableCell>
+                                                            <TableCell className="font-medium">공기 온도 (<Latex formula="\theta_{air}" />)</TableCell>
                                                             <TableCell className="text-right">{formatNum(log.theta_air, 2)} °C</TableCell>
                                                         </TableRow>
                                                     )}
                                                     {log.theta_s !== undefined && (
                                                         <TableRow className="bg-muted/30">
-                                                            <TableCell className="font-medium">표면 온도 (<InlineMath math="\theta_{s}" />)</TableCell>
+                                                            <TableCell className="font-medium">표면 온도 (<Latex formula="\theta_{s}" />)</TableCell>
                                                             <TableCell className="text-right">{formatNum(log.theta_s, 2)} °C</TableCell>
                                                         </TableRow>
                                                     )}
                                                     {log.theta_m !== undefined && (
                                                         <TableRow className="bg-muted/30">
-                                                            <TableCell className="font-medium">구체 온도 (<InlineMath math="\theta_{m}" />)</TableCell>
+                                                            <TableCell className="font-medium">구체 온도 (<Latex formula="\theta_{m}" />)</TableCell>
                                                             <TableCell className="text-right">{formatNum(log.theta_m, 2)} °C</TableCell>
                                                         </TableRow>
                                                     )}

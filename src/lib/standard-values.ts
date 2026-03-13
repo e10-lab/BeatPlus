@@ -11,7 +11,7 @@ export interface ProjectStats {
  * 최종 에너지(kWh)를 1차 에너지(kWh)로 변환하는 데 사용되는 계수입니다.
  */
 export const PEF_FACTORS: Record<EnergyCarrier, number> = {
-    electricity: 1.8, // 최신 그리드 환경을 반영하여 2.75에서 1.8로 하향 조정
+    electricity: 1.8, // DIN/TS 18599:2025-10 기반 최신 그리드 환경을 반영하여 2.75에서 1.8로 하향 조정
     natural_gas: 1.1,
     oil: 1.1,
     lpg: 1.1,
@@ -42,7 +42,7 @@ export const CO2_FACTORS: Record<EnergyCarrier, number> = {
 export const FX_DEFAULTS = {
     DIRECT: 1.0,    // 외기 직접 면함
     INDIRECT: 0.5,  // 비난방 공간 또는 인접 존 간접 면함
-    GROUND: 0.6     // 지면 접함 (DIN 18599-2 표 3 참조, 바닥은 0.6, 벽은 0.5~0.6)
+    GROUND: 0.6     // 지면 접함 (DIN/TS 18599-2:2025-10 표 3 참조, 바닥은 0.6, 벽은 0.5~0.6)
 };
 
 /**

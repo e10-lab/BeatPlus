@@ -4,7 +4,7 @@ import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Zap } from "lucide-react";
-import { InlineMath } from "react-katex";
+import { Latex } from "@/components/ui/latex";
 import { formatNum } from "../../utils/formatters";
 import { VerificationSection } from "../shared/verification-ui";
 
@@ -38,78 +38,78 @@ export function HeatingSection({
               <TableHead className="w-24 text-slate-600">구분 (Item)</TableHead>
               <TableHead className="text-right">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">일수 (<InlineMath math="d" />)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">일수 (<Latex formula="d" />)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">운전 일수 (<InlineMath math="d" />)</p>
+                    <p className="font-bold mb-1">운전 일수 (<Latex formula="d" />)</p>
                     해당 운전 모드(사용/비사용)의 월간 일수
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-right">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><InlineMath math="\tau_h" /> (h)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><Latex formula="\tau_h" /> (h)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">시상수 (<InlineMath math="\tau_h" />)</p>
+                    <p className="font-bold mb-1">시상수 (<Latex formula="\tau_h" />)</p>
                     건물의 열적 관성을 나타내는 시간 상수 (시간)
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-right">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><InlineMath math="a_h" /> (-)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><Latex formula="a_h" /> (-)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">수치적 매개변수 (<InlineMath math="a_h" />)</p>
+                    <p className="font-bold mb-1">수치적 매개변수 (<Latex formula="a_h" />)</p>
                     시상수와 유효 열용량에 따른 무차원 매개변수
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-right">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><InlineMath math="\gamma_h" /> (-)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><Latex formula="\gamma_h" /> (-)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">열획득/열손실 비 (<InlineMath math="\gamma_h" />)</p>
+                    <p className="font-bold mb-1">열획득/열손실 비 (<Latex formula="\gamma_h" />)</p>
                     태양 및 내부 열획득과 전송 및 환기 열손실의 비율
                     <div className="mt-1 text-slate-400">
-                      <InlineMath math="\gamma_h = Q_{gain} / Q_{loss}" />
+                      <Latex formula="\gamma_h = Q_{gain} / Q_{loss}" />
                     </div>
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-right">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><InlineMath math="Q_{sink}" /> (kWh)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><Latex formula="Q_{sink}" /> (kWh)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">열싱크 (<InlineMath math="Q_{sink}" />)</p>
-                    난방의 경우 총 열손실(<InlineMath math="Q_{loss}" />)과 동일
+                    <p className="font-bold mb-1">열싱크 (<Latex formula="Q_{sink}" />)</p>
+                    난방의 경우 총 열손실(<Latex formula="Q_{loss}" />)과 동일
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-right">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><InlineMath math="Q_{source}" /> (kWh)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><Latex formula="Q_{source}" /> (kWh)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">열소스 (<InlineMath math="Q_{source}" />)</p>
-                    난방의 경우 총 열획득(<InlineMath math="Q_{gain}" />)과 동일
+                    <p className="font-bold mb-1">열소스 (<Latex formula="Q_{source}" />)</p>
+                    난방의 경우 총 열획득(<Latex formula="Q_{gain}" />)과 동일
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-right">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><InlineMath math="\eta_h" /> (-)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><Latex formula="\eta_h" /> (-)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">이용계수 (<InlineMath math="\eta_h" />)</p>
+                    <p className="font-bold mb-1">이용계수 (<Latex formula="\eta_h" />)</p>
                     열획득이 난방 부하 감소에 기여하는 비율
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-right font-bold text-red-700 bg-red-50/50">
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><InlineMath math="Q_{h,b}" /> (kWh)</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2"><Latex formula="Q_{h,b}" /> (kWh)</span></TooltipTrigger>
                   <TooltipContent className="max-w-xs p-2 text-[11px]">
-                    <p className="font-bold mb-1">난방 요구량 (<InlineMath math="Q_{h,b}" />)</p>
+                    <p className="font-bold mb-1">난방 요구량 (<Latex formula="Q_{h,b}" />)</p>
                     최종적으로 필요한 난방 에너지
                     <div className="mt-1 text-slate-400">
-                      <InlineMath math="Q_{h,b} = Q_{sink} - \eta_h \cdot Q_{source}" />
+                      <Latex formula="Q_{h,b} = Q_{sink} - \eta_h \cdot Q_{source}" />
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -154,10 +154,10 @@ export function HeatingSection({
         </Table>
         <div className="bg-slate-50/30 px-4 py-2 border-t border-red-100 flex items-center justify-end gap-x-6">
           <div className="text-[10px] text-slate-500 font-serif italic">
-            <InlineMath math="Q_{h,b} = Q_{sink} - \eta_h \cdot Q_{source}" />
+            <Latex formula="Q_{h,b} = Q_{sink} - \eta_h \cdot Q_{source}" />
           </div>
           <div className="text-[10px] text-slate-400 font-serif italic">
-            (<InlineMath math="Q_{sink} = Q_{loss}" />, <InlineMath math="Q_{source} = Q_{gain}" />)
+            (<Latex formula="Q_{sink} = Q_{loss}" />, <Latex formula="Q_{source} = Q_{gain}" />)
           </div>
         </div>
       </div>
@@ -177,78 +177,78 @@ export function HeatingSection({
                 <TableHead className="w-24 text-slate-600">구분 (Item)</TableHead>
                 <TableHead className="text-right">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">일수 (<InlineMath math="d" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">일수 (<Latex formula="d" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">운전 일수 (<InlineMath math="d" />)</p>
+                      <p className="font-bold mb-1">운전 일수 (<Latex formula="d" />)</p>
                       해당 운전 모드(사용/비사용)의 월간 일수
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
                 <TableHead className="text-right">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">배관길이 (<InlineMath math="L" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">배관길이 (<Latex formula="L" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">배관 길이 (<InlineMath math="L" />)</p>
+                      <p className="font-bold mb-1">배관 길이 (<Latex formula="L" />)</p>
                       난방 배관의 총 길이 (m)
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
                 <TableHead className="text-right">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">열관류율 (<InlineMath math="U" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">열관류율 (<Latex formula="U" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">선형 열관류율 (<InlineMath math="U" />)</p>
+                      <p className="font-bold mb-1">선형 열관류율 (<Latex formula="U" />)</p>
                       배관의 단위 길이당 열관류율 (W/mK)
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
                 <TableHead className="text-right">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">온도차 (<InlineMath math="\Delta \theta" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">온도차 (<Latex formula="\Delta \theta" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">평균 온도차 (<InlineMath math="\Delta \theta" />)</p>
+                      <p className="font-bold mb-1">평균 온도차 (<Latex formula="\Delta \theta" />)</p>
                       배관 내 열매체 평균 온도와 주위 온도의 차이 (K)
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
                 <TableHead className="text-right font-bold text-orange-700">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">배관손실 (<InlineMath math="Q_d" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">배관손실 (<Latex formula="Q_d" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">배관 열손실 (<InlineMath math="Q_d" />)</p>
+                      <p className="font-bold mb-1">배관 열손실 (<Latex formula="Q_d" />)</p>
                       배관을 통한 월간 열손실 (kWh)
                       <div className="mt-1 text-slate-400">
-                        <InlineMath math="Q_d = L \cdot U \cdot \Delta \theta \cdot t \cdot 10^{-3}" />
+                        <Latex formula="Q_d = L \cdot U \cdot \Delta \theta \cdot t \cdot 10^{-3}" />
                       </div>
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
                 <TableHead className="text-right">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">저장용량 (<InlineMath math="V_s" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">저장용량 (<Latex formula="V_s" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">저장 탱크 용량 (<InlineMath math="V_s" />)</p>
+                      <p className="font-bold mb-1">저장 탱크 용량 (<Latex formula="V_s" />)</p>
                       난방 버퍼 탱크의 용량 (Liter)
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
                 <TableHead className="text-right">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">일일손실 (<InlineMath math="Q_{s,d}" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">일일손실 (<Latex formula="Q_{s,d}" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">일일 저장 손실 (<InlineMath math="Q_{s,d}" />)</p>
+                      <p className="font-bold mb-1">일일 저장 손실 (<Latex formula="Q_{s,d}" />)</p>
                       저장 탱크의 하루 당 열손실 (kWh/d)
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>
                 <TableHead className="text-right">
                   <Tooltip>
-                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">저장손실 (<InlineMath math="Q_s" />)</span></TooltipTrigger>
+                    <TooltipTrigger asChild><span className="cursor-help decoration-dotted underline underline-offset-2">저장손실 (<Latex formula="Q_s" />)</span></TooltipTrigger>
                     <TooltipContent className="max-w-xs p-2 text-[11px]">
-                      <p className="font-bold mb-1">저장 열손실 (<InlineMath math="Q_s" />)</p>
+                      <p className="font-bold mb-1">저장 열손실 (<Latex formula="Q_s" />)</p>
                       저장 탱크의 월간 총 열손실 (kWh)
                       <div className="mt-1 text-slate-400">
-                        <InlineMath math="Q_s = Q_{s,d} \cdot d" />
+                        <Latex formula="Q_s = Q_{s,d} \cdot d" />
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -270,7 +270,7 @@ export function HeatingSection({
                   )}
                 </TableCell>
                 <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.L, 1)} m</TableCell>
-                <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.U, 2)}</TableCell>
+                <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.U, 3)}</TableCell>
                 <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.op?.dT, 1)} K</TableCell>
                 <TableCell className="text-right font-medium text-orange-600 bg-orange-50/10">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.op?.Q_loss, 1)}</TableCell>
                 <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.storage?.V_s, 1)} L</TableCell>
@@ -289,7 +289,7 @@ export function HeatingSection({
                   )}
                 </TableCell>
                 <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.L, 1)} m</TableCell>
-                <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.U, 2)}</TableCell>
+                <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.U, 3)}</TableCell>
                 <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.non_op?.dT, 1)} K</TableCell>
                 <TableCell className="text-right font-medium text-orange-600 bg-orange-50/10">{formatNum(currentMonthData.systemLosses?.heating?.details?.distribution?.non_op?.Q_loss, 1)}</TableCell>
                 <TableCell className="text-right text-slate-500">{formatNum(currentMonthData.systemLosses?.heating?.details?.storage?.V_s, 1)} L</TableCell>
@@ -301,10 +301,10 @@ export function HeatingSection({
         </div>
         <div className="bg-slate-50/30 px-4 py-2 border-t border-orange-100 flex items-center justify-end gap-x-6">
           <div className="text-[10px] text-slate-500 font-serif italic">
-            <InlineMath math="Q_{sys} = Q_d + Q_s" />
+            <Latex formula="Q_{sys} = Q_d + Q_s" />
           </div>
           <div className="text-[10px] text-slate-400 font-serif italic">
-            <InlineMath math="Q_d = L \cdot U \cdot \Delta \theta \cdot t \cdot 10^{-3}" />, <InlineMath math="Q_s = Q_{s,d} \cdot d" />
+            <Latex formula="Q_d = L \cdot U \cdot \Delta \theta \cdot t \cdot 10^{-3}" />, <Latex formula="Q_s = Q_{s,d} \cdot d" />
           </div>
         </div>
       </div>

@@ -41,7 +41,7 @@ export function ClimateDataChartDialog({ station, trigger }: ClimateDataChartDia
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <CloudSun className="h-5 w-5" />
-                        기후 데이터: {station.name} (2021-2025 평균)
+                        기후 데이터: {station.name} (TMYx 2009-2023)
                     </DialogTitle>
                 </DialogHeader>
 
@@ -99,7 +99,7 @@ export function ClimateDataChartDialog({ station, trigger }: ClimateDataChartDia
                 </div>
 
                 <div className="mt-4 text-xs text-muted-foreground text-center">
-                    * 데이터 출처: 기상청 종관기상관측(ASOS) 자료 기반 2021-2025년 평균값
+                    * 데이터 출처: EnergyPlus Weather (EPW) TMYx (2009-2023) 표준 기상 데이터
                 </div>
             </DialogContent>
         </Dialog>

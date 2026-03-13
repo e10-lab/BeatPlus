@@ -3,7 +3,7 @@
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Droplets } from "lucide-react";
-import { InlineMath } from "react-katex";
+import { Latex } from "@/components/ui/latex";
 import { formatNum } from "../../utils/formatters";
 import { VerificationSection, MathTooltip } from "../shared/verification-ui";
 
@@ -45,7 +45,7 @@ export function DHWSection({
                 <MathTooltip math="d" title="운영 일수 (d) 월간 급탕 설비 가동 일수">일수 (d)</MathTooltip>
               </TableHead>
               <TableHead className="text-right font-bold text-blue-700">
-                <MathTooltip math="Q_{w,b}" title="급탕 에너지 요구량 (Q_{w,b}) 최종 유효 급탕 에너지 수요 (kWh/월) <div className='mt-1 text-slate-400'><InlineMath math='Q_{w,b} = q_{w,b,day} \cdot A_{NGF} \cdot d \cdot 10^{-3}' /></div>">요구량 (kWh)</MathTooltip>
+                <MathTooltip math="Q_{w,b}" title="급탕 에너지 요구량 (Q_{w,b}) 최종 유효 급탕 에너지 수요 (kWh/월) <div className='mt-1 text-slate-400'><Latex formula='Q_{w,b} = q_{w,b,day} \cdot A_{NGF} \cdot d \cdot 10^{-3}' /></div>">요구량 (kWh)</MathTooltip>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -81,7 +81,7 @@ export function DHWSection({
         </Table>
         <div className="bg-slate-50/30 px-4 py-2 border-t border-blue-100 flex flex-wrap items-center justify-end gap-x-6">
           <div className="text-[10px] text-slate-500 font-serif italic">
-            <InlineMath math="Q_{w,b} = q_{w,b,day} \cdot A_{NGF} \cdot d_{op} \cdot 10^{-3}" />
+            <Latex formula="Q_{w,b} = q_{w,b,day} \cdot A_{NGF} \cdot d_{op} \cdot 10^{-3}" />
           </div>
           <div className="text-[10px] text-slate-400 font-serif italic">
             * 배관 및 저장 손실 상세 내역은 하단 테이블 참조
@@ -168,10 +168,10 @@ export function DHWSection({
       </div>
       <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 py-3 bg-slate-50/30 border-t border-blue-50 mt-6 md:px-4">
         <div className="text-[10px] text-blue-800 font-serif opacity-80">
-          <InlineMath math="Q_{w,d} = L_{w,d} \cdot U_l \cdot (\theta_{w,av} - \theta_i) \cdot 24 \cdot d \cdot 10^{-3}" />
+          <Latex formula="Q_{w,d} = L_{w,d} \cdot U_l \cdot (\theta_{w,av} - \theta_i) \cdot 24 \cdot d \cdot 10^{-3}" />
         </div>
         <div className="text-[10px] text-blue-800 font-serif opacity-80">
-          <InlineMath math="Q_{w,s} = q_{w,s,day} \cdot d \cdot 10^{-3}" />
+          <Latex formula="Q_{w,s} = q_{w,s,day} \cdot d \cdot 10^{-3}" />
         </div>
       </div>
     </VerificationSection>

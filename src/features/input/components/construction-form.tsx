@@ -10,7 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Trash2, Plus, Info } from "lucide-react";
+import { Trash2, Plus, GripVertical, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Latex } from "@/components/ui/latex";
 import { Construction, Layer, SurfaceType } from "@/types/project";
 import { DEFAULT_MATERIALS, SURFACE_HEAT_RESISTANCE, CATEGORY_LABELS, FRAME_TYPES } from "@/lib/materials";
 import { FX_DEFAULTS } from "@/lib/standard-values";
@@ -472,7 +474,15 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
 
                     {/* Exposure */}
                     <FormItem className="min-w-0">
-                        <FormLabel>외기 접촉 (Exposure)</FormLabel>
+                        <FormLabel className="flex items-center gap-1 mb-2">
+                            외기 접촉 (Exposure)
+                            <TooltipProvider delayDuration={300}>
+                                <Tooltip>
+                                    <TooltipTrigger type="button" tabIndex={-1}><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
+                                    <TooltipContent><p className="flex items-center gap-1">부위가 외기와 접하는 조건에 따른 온도 보정 계수(<Latex formula="F_x" />)를 결정합니다.</p></TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </FormLabel>
                         <Select
                             value={currentExposure}
                             onValueChange={(val) => handleExposureChange(val as Exposure)}
@@ -483,10 +493,22 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                <SelectItem value="direct">직접 (Direct) (Fx={FX_DEFAULTS.DIRECT.toFixed(1)})</SelectItem>
-                                <SelectItem value="indirect">간접 (Indirect) (Fx={FX_DEFAULTS.INDIRECT.toFixed(1)})</SelectItem>
+                                <SelectItem value="direct">
+                                    <div className="flex items-center gap-1">
+                                        직접 (Direct) (<Latex formula="F_x" />={FX_DEFAULTS.DIRECT.toFixed(1)})
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="indirect">
+                                    <div className="flex items-center gap-1">
+                                        간접 (Indirect) (<Latex formula="F_x" />={FX_DEFAULTS.INDIRECT.toFixed(1)})
+                                    </div>
+                                </SelectItem>
                                 {!['window', 'door'].includes(currentCategory) && (
-                                    <SelectItem value="ground">지면 (Ground) (Fx={FX_DEFAULTS.GROUND.toFixed(1)})</SelectItem>
+                                    <SelectItem value="ground">
+                                        <div className="flex items-center gap-1">
+                                            지면 (Ground) (<Latex formula="F_x" />={FX_DEFAULTS.GROUND.toFixed(1)})
+                                        </div>
+                                    </SelectItem>
                                 )}
                             </SelectContent>
                         </Select>
@@ -535,9 +557,23 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                                     (currentType === "wall_exterior" || currentType === "roof_exterior") && (
                                         <div className="px-4 py-3 bg-slate-100 rounded border border-slate-200">
                                             <div className="flex flex-col gap-2">
-                                                <FormLabel className="text-xs text-muted-foreground block">
-                                                    태양 복사 흡수율 (Solar Absorption Coefficient) - α
-                                                </FormLabel>
+                                                <div className="flex items-center gap-1 mb-2">
+                                                    <FormLabel className="text-xs text-muted-foreground m-0">
+                                                        태양 복사 흡수율 (Solar Absorption Coefficient)
+                                                    </FormLabel>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger type="button" tabIndex={-1}>
+                                                                <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="max-w-xs">
+                                                                 <p>외기가 닿는 불투명 외피표면이 태양 복사를 흡수하는 비율입니다. (DIN/TS 18599-2:2025-10)</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                    <span className="text-muted-foreground">-</span>
+                                                    <Latex formula="\alpha" />
+                                                </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {currentType.startsWith("wall") ? (
                                                         // Wall Options
@@ -596,10 +632,16 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                                 {/* Surface Resistance Display */
                                     <div className="flex gap-2 items-center px-4 py-2 bg-slate-100 rounded text-xs text-muted-foreground border border-slate-200">
                                         <div className="w-6"></div>
-                                        <div className="flex-1 font-medium">
-                                            {currentCategory === "floor"
-                                                ? "실내 표면 (Indoor Surface) - R_si"
-                                                : "실외 표면 (Outdoor Surface) - R_se"}
+                                        <div className="flex-1 font-medium flex items-center gap-2">
+                                            {currentCategory === "floor" ? "실내 표면 (Indoor Surface)" : "실외 표면 (Outdoor Surface)"}
+                                            <TooltipProvider delayDuration={300}>
+                                                <Tooltip>
+                                                    <TooltipTrigger type="button" tabIndex={-1}><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
+                                                    <TooltipContent><p>{currentCategory === "floor" ? "실내측 공기 경계면의 표면 열저항입니다." : "실외측 공기 경계면의 표면 열저항입니다. 외풍 등에 영향을 받습니다."}</p></TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <span className="text-muted-foreground font-normal">-</span>
+                                            <Latex formula={currentCategory === "floor" ? "R_{si}" : "R_{se}"} />
                                         </div>
                                         <div className="w-24 text-right font-mono">
                                             {currentCategory === "floor" ? r_si : r_se} m²K/W
@@ -613,12 +655,39 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                             fields.length > 0 && currentCategory !== "window" && currentCategory !== "door" && (
                                 <div className="hidden md:grid grid-cols-[30px_140px_1fr_80px_80px_80px_100px_90px] gap-4 px-2 py-2 text-xs font-semibold text-muted-foreground bg-slate-50 border-b">
                                     <div className="text-center">#</div>
-                                    <div>분류</div>
-                                    <div>자재명</div>
-                                    <div className="text-right">열전도율<br />(W/mK)</div>
-                                    <div className="text-right">밀도<br />(kg/m³)</div>
-                                    <div className="text-right">비열<br />(J/kgK)</div>
-                                    <div className="text-right">두께<br />(mm)</div>
+                                    <div className="text-center">분류</div>
+                                    <div className="text-center">자재명</div>
+                                    <div className="text-center flex flex-col items-center justify-center">
+                                        <div className="flex items-center gap-1">
+                                            열전도율
+                                            <TooltipProvider delayDuration={300}><Tooltip><TooltipTrigger type="button" tabIndex={-1}><Info className="w-3 h-3 text-muted-foreground opacity-70" /></TooltipTrigger><TooltipContent><p>열이 물질을 통과하는 정도입니다. 낮을수록 단열 성능이 좋습니다.</p></TooltipContent></Tooltip></TooltipProvider>
+                                            <Latex formula="\lambda" />
+                                        </div>
+                                        <span className="text-[10px] font-normal mt-0.5">(W/mK)</span>
+                                    </div>
+                                    <div className="text-center flex flex-col items-center justify-center">
+                                        <div className="flex items-center gap-1">
+                                            밀도
+                                            <TooltipProvider delayDuration={300}><Tooltip><TooltipTrigger type="button" tabIndex={-1}><Info className="w-3 h-3 text-muted-foreground opacity-70" /></TooltipTrigger><TooltipContent><p>단위 체적당 질량으로, 건물의 열용량 산정에 영향을 줍니다.</p></TooltipContent></Tooltip></TooltipProvider>
+                                            <Latex formula="\rho" />
+                                        </div>
+                                        <span className="text-[10px] font-normal mt-0.5">(kg/m³)</span>
+                                    </div>
+                                    <div className="text-center flex flex-col items-center justify-center">
+                                        <div className="flex items-center gap-1">
+                                            비열
+                                            <TooltipProvider delayDuration={300}><Tooltip><TooltipTrigger type="button" tabIndex={-1}><Info className="w-3 h-3 text-muted-foreground opacity-70" /></TooltipTrigger><TooltipContent><p>1kg의 온도를 1K 올리는 데 필요한 열량입니다.</p></TooltipContent></Tooltip></TooltipProvider>
+                                            <Latex formula="c" />
+                                        </div>
+                                        <span className="text-[10px] font-normal mt-0.5">(J/kgK)</span>
+                                    </div>
+                                    <div className="text-center flex flex-col items-center justify-center">
+                                        <div className="flex items-center gap-1">
+                                            두께
+                                            <Latex formula="d" />
+                                        </div>
+                                        <span className="text-[10px] font-normal mt-0.5">(mm)</span>
+                                    </div>
                                     <div className="text-center">작업</div>
                                 </div>
                             )
@@ -832,10 +901,16 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                         {fields.length > 0 && currentCategory !== "window" && currentCategory !== "door" && (
                             <div className="flex gap-2 items-center px-4 py-2 bg-slate-100 rounded text-xs text-muted-foreground border border-slate-200">
                                 <div className="w-6"></div>
-                                <div className="flex-1 font-medium">
-                                    {currentCategory === "floor"
-                                        ? "실외 표면 (Outdoor Surface) - R_se"
-                                        : "실내 표면 (Indoor Surface) - R_si"}
+                                <div className="flex-1 font-medium flex items-center gap-2">
+                                    {currentCategory === "floor" ? "실외 표면 (Outdoor Surface)" : "실내 표면 (Indoor Surface)"}
+                                    <TooltipProvider delayDuration={300}>
+                                        <Tooltip>
+                                            <TooltipTrigger type="button" tabIndex={-1}><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
+                                            <TooltipContent><p>{currentCategory === "floor" ? "실외측 공기 경계면의 표면 열저항입니다." : "실내측 공기 경계면의 표면 열저항입니다."}</p></TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                    <span className="text-muted-foreground font-normal">-</span>
+                                    <Latex formula={currentCategory === "floor" ? "R_{se}" : "R_{si}"} />
                                 </div>
                                 <div className="w-24 text-right font-mono">
                                     {currentCategory === "floor" ? r_se : r_si} m²K/W
@@ -882,7 +957,16 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                             </div>
                         ) : (
                             <div>
-                                <div className="text-sm text-muted-foreground">총 열저항 (Rt)</div>
+                                <div className="flex items-center justify-center gap-2 mb-1">
+                                    <div className="text-sm text-muted-foreground">총 열저항</div>
+                                    <TooltipProvider delayDuration={300}>
+                                        <Tooltip>
+                                            <TooltipTrigger type="button" tabIndex={-1}><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
+                                            <TooltipContent><p>내/외부 표면 열저항과 각 레이어의 열저항을 모두 합한 값입니다.</p></TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                    <Latex formula="R_t" />
+                                </div>
                                 <div className="text-xl font-mono">{totalR.toFixed(3)} m²K/W</div>
                             </div>
                         )}
@@ -896,7 +980,16 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                         {/* Slot 3: U-Value */}
                         <div className="font-bold text-primary">
                             <div className="flex items-center justify-center gap-2 mb-1">
-                                <div className="text-sm text-muted-foreground">열관류율 (U-Value)</div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="text-sm text-muted-foreground">열관류율</div>
+                                    <TooltipProvider delayDuration={300}>
+                                        <Tooltip>
+                                            <TooltipTrigger type="button" tabIndex={-1}><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
+                                            <TooltipContent><p className="flex items-center gap-1">외피 전체를 통해 단위 면적 당 전달되는 열량입니다. (<Latex formula="U = 1/R_t" />)</p></TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                    <Latex formula="U\text{-Value}" />
+                                </div>
                                 <div className="flex items-center space-x-1">
                                     <Checkbox
                                         id="u-value-manual"
@@ -927,7 +1020,7 @@ export function ConstructionForm({ projectId, initialData, onSave, onCancel }: C
                     </CardContent>
                 </Card>
 
-                <div className="flex justify-end gap-2">
+                <div className="sticky bottom-0 z-10 flex justify-end gap-2 py-4 bg-white/95 backdrop-blur-sm border-t mt-4 -mx-1 px-1">
                     <Button type="button" variant="outline" onClick={onCancel}>취소 (Cancel)</Button>
                     <Button type="submit">외피 유형 저장 (Save Assembly)</Button>
                 </div>

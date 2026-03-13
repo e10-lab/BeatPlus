@@ -137,8 +137,8 @@ export const runVerifications = (): VerificationResult[] => {
         }
 
         // Assertions
-        const totalHeating = calculation.monthly.reduce((sum, m) => sum + m.Q_h_b, 0);
-        const totalCooling = calculation.monthly.reduce((sum, m) => sum + m.Q_c_b, 0);
+        const totalHeating = calculation.monthly.reduce((sum: number, m: any) => sum + m.Q_h_b, 0);
+        const totalCooling = calculation.monthly.reduce((sum: number, m: any) => sum + m.Q_c_b, 0);
 
         // 1-1. Heating Demand > 0 (Seoul is cold in winter)
         // 1-1. Heating Demand > 0 (Seoul is cold in winter)

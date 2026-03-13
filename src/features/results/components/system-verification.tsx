@@ -5,8 +5,7 @@ import { MonthlyResult } from "@/engine/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronDown, ChevronRight, Flame, Droplets, Zap, Thermometer, PipetteIcon, Database, BarChart3 } from "lucide-react";
-import { InlineMath, BlockMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
+import { Latex } from "@/components/ui/latex";
 
 
 interface SystemVerificationProps {
@@ -24,7 +23,7 @@ function fmt(v: number | undefined | null, dp = 1): string {
 function K({ math, unit, tip, formula }: { math: string; unit?: string; tip?: string; formula?: string }) {
     const inner = (
         <span className={`whitespace-nowrap ${tip ? "cursor-help decoration-dotted underline underline-offset-2" : ""}`}>
-            <InlineMath math={math} />
+            <Latex formula={math} />
             {unit && <span className="text-[10px] ml-0.5 normal-case">{unit}</span>}
         </span>
     );
@@ -35,11 +34,11 @@ function K({ math, unit, tip, formula }: { math: string; unit?: string; tip?: st
         <Tooltip>
             <TooltipTrigger asChild>{inner}</TooltipTrigger>
             <TooltipContent side="top" className="max-w-[420px] text-xs p-3">
-                <p className="font-bold mb-1"><InlineMath math={math} /></p>
+                <p className="font-bold mb-1"><Latex formula={math} /></p>
                 <p className="text-muted-foreground mb-1.5">{tip}</p>
                 {formula && (
                     <div className="border-t pt-1.5 mt-1 overflow-x-auto">
-                        <BlockMath math={formula} />
+                        <Latex formula={formula} displayMode />
                     </div>
                 )}
             </TooltipContent>
@@ -116,12 +115,12 @@ export function SystemVerification({ data, title }: SystemVerificationProps) {
                 <h3 className="text-lg font-bold tracking-tight">{title}</h3>
             )}
             <p className="text-sm text-muted-foreground mb-4">
-                DIN/TS 18599-5 (난방) 및 DIN/TS 18599-8 (급탕) 기반 설비 손실 상세 검증
+                DIN/TS 18599-5:2025-10 (난방) 및 DIN/TS 18599-8:2025-10 (급탕) 기반 설비 손실 상세 검증
             </p>
 
             {/* ── 섹션 1: 난방 운전 조건 ── */}
             <Section
-                title={<>1. 난방 운전 조건 <span className="text-muted-foreground font-normal">(DIN/TS 18599-5 §5)</span></>}
+                title={<>1. 난방 운전 조건 <span className="text-muted-foreground font-normal">(DIN/TS 18599-5:2025-10 §5)</span></>}
                 icon={<Thermometer className="h-4 w-4 text-white" />}
                 iconColor="bg-orange-500"
                 defaultOpen={true}
@@ -166,7 +165,7 @@ export function SystemVerification({ data, title }: SystemVerificationProps) {
 
             {/* ── 섹션 2: 방열 손실 ── */}
             <Section
-                title={<>2. 방열 손실 <span className="text-muted-foreground font-normal">(DIN/TS 18599-5 §6.1~6.2)</span></>}
+                title={<>2. 방열 손실 <span className="text-muted-foreground font-normal">(DIN/TS 18599-5:2025-10 §6.1~6.2)</span></>}
                 icon={<Flame className="h-4 w-4 text-white" />}
                 iconColor="bg-red-500"
             >
@@ -278,7 +277,7 @@ export function SystemVerification({ data, title }: SystemVerificationProps) {
 
             {/* ── 섹션 6: 급탕 배관/저장 손실 ── */}
             <Section
-                title={<>6. 급탕 배관/저장 손실 <span className="text-muted-foreground font-normal">(DIN/TS 18599-8)</span></>}
+                title={<>6. 급탕 배관/저장 손실 <span className="text-muted-foreground font-normal">(DIN/TS 18599-8:2025-10)</span></>}
                 icon={<Droplets className="h-4 w-4 text-white" />}
                 iconColor="bg-cyan-500"
             >
@@ -394,7 +393,7 @@ function FlowCard({ label, math, value, color, bold, tip, formula }: {
                 <div className={`p-3 rounded-md bg-background border cursor-help ${bold ? "border-2 border-emerald-300" : ""}`}>
                     <div className="text-muted-foreground text-[10px] uppercase tracking-wider">{label}</div>
                     <div className="text-muted-foreground text-[11px] mb-1">
-                        <InlineMath math={math} />
+                        <Latex formula={math} />
                     </div>
                     <div className={`text-lg ${bold ? "font-bold" : "font-semibold"} ${color}`}>
                         {value.toFixed(0)}
@@ -404,11 +403,11 @@ function FlowCard({ label, math, value, color, bold, tip, formula }: {
             </TooltipTrigger>
             {tip && (
                 <TooltipContent side="top" className="max-w-[420px] text-xs p-3">
-                    <p className="font-bold mb-1"><InlineMath math={math} /></p>
+                    <p className="font-bold mb-1"><Latex formula={math} /></p>
                     <p className="text-muted-foreground mb-1.5">{tip}</p>
                     {formula && (
                         <div className="border-t pt-1.5 mt-1 overflow-x-auto">
-                            <BlockMath math={formula} />
+                            <Latex formula={formula} displayMode />
                         </div>
                     )}
                 </TooltipContent>

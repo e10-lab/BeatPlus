@@ -64,7 +64,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-        <p>&copy; 2026 DIN 18599 Web Tool. All rights reserved.</p>
+        <p>&copy; 2026 DIN/TS 18599 Web Tool. All rights reserved.</p>
       </footer>
     </div>
   );

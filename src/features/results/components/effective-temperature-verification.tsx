@@ -5,8 +5,7 @@ import { MonthlyResult } from "@/engine/types";
 import { Zone } from "@/types/project";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import 'katex/dist/katex.min.css';
-import { InlineMath } from 'react-katex';
+import { Latex } from "@/components/ui/latex";
 import { formatNum } from "../utils/formatters";
 import { useVerificationState } from "../hooks/use-verification-state";
 import { VerificationSection, MonthSelector } from "./shared/verification-ui";
@@ -54,7 +53,7 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                     <div>
                         <CardTitle>{title || "유효 실내 온도 산정 검증 (Effective Temperature)"}</CardTitle>
                         <CardDescription>
-                            DIN 18599-2에 따른 시정수(<InlineMath math="\tau" />), 이용효율(<InlineMath math="\eta" />), 그리고 최종 유효 온도(<InlineMath math="\theta_{i,eff}" />) 산출 과정
+                            DIN/TS 18599-2:2025-10에 따른 시정수(<Latex formula="\tau" />), 이용효율(<Latex formula="\eta" />), 그리고 최종 유효 온도(<Latex formula="\theta_{i,eff}" />) 산출 과정
                         </CardDescription>
                     </div>
                     <MonthSelector 
@@ -65,55 +64,68 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                 </CardHeader>
                 <CardContent className="space-y-8">
                     {/* Step 1: Time Constant */}
-                    <VerificationSection step="Step 1" title="시정수 산정 (Time Constant, \tau)">
+                    <VerificationSection 
+                        step="Step 1" 
+                        title={<>시정수 산정 (Time Constant, <Latex formula="\tau" />)</>}
+                    >
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                                <div className="text-xs text-slate-500 font-medium mb-1">유효 열용량 (<InlineMath math="C_m" />)</div>
+                                <div className="text-xs text-slate-500 font-medium mb-1">유효 열용량 (<Latex formula="C_m" />)</div>
                                 <div className="text-xl font-bold">{formatNum(Cm, 0)} <span className="text-sm font-normal">Wh/K</span></div>
+                                <div className="text-xs text-slate-400 mt-1">
+                                    <Latex formula="C_m = c_{wirk} \cdot A_{NGF}" />
+                                </div>
                             </div>
                             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                                <div className="text-xs text-slate-500 font-medium mb-1">관류 열전달계수 (<InlineMath math="H_{tr}" />)</div>
+                                <div className="text-xs text-slate-500 font-medium mb-1">관류 열전달계수 (<Latex formula="H_{tr}" />)</div>
                                 <div className="text-xl font-bold">{formatNum(H_tr, 1)} <span className="text-sm font-normal">W/K</span></div>
                             </div>
                             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                                <div className="text-xs text-slate-500 font-medium mb-1">환기 열전달계수 (<InlineMath math="H_{ve}" />)</div>
+                                <div className="text-xs text-slate-500 font-medium mb-1">환기 열전달계수 (<Latex formula="H_{ve}" />)</div>
                                 <div className="text-xl font-bold">{formatNum(H_ve, 1)} <span className="text-sm font-normal">W/K</span></div>
                             </div>
                             <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
-                                <div className="text-xs text-blue-600 font-medium mb-1">시정수 (<InlineMath math="\tau" />)</div>
+                                <div className="text-xs text-blue-600 font-medium mb-1">시정수 (<Latex formula="\tau" />)</div>
                                 <div className="text-2xl font-bold text-blue-700">{formatNum(tau, 1)} <span className="text-sm font-normal">h</span></div>
                                 <div className="text-xs text-blue-500 mt-1">
-                                    <InlineMath math="\tau = \frac{C_m}{H_{tr} + H_{ve}}" />
+                                    <Latex formula="\tau = \frac{C_m}{H_{tr} + H_{ve}}" />
                                 </div>
                             </div>
                         </div>
                     </VerificationSection>
 
                     {/* Step 2: Setback Factors */}
-                    <VerificationSection step="Step 2" title="감경 계수 (Setback Factors, f_{NA}, f_{we})">
+                    <VerificationSection 
+                        step="Step 2" 
+                        title={<>감경 계수 (Setback Factors, <Latex formula="f_{NA}, f_{we}" />)</>}
+                    >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <div className="text-xs text-slate-500 font-medium mb-1">
-                                            야간 감경 계수 (<InlineMath math="f_{NA}" />)
+                                            야간 감경 계수 (<Latex formula="f_{NA}" />)
                                             {zone?.heatingReducedMode === "shutdown"
                                                 ? <span className="ml-1 text-[10px] text-red-500">(Shutdown)</span>
-                                                : <span className="ml-1 text-[10px] text-blue-500">(Setback)</span>
+                                                : zone?.heatingReducedMode === "continuous"
+                                                    ? <span className="ml-1 text-[10px] text-green-500">(Continuous)</span>
+                                                    : <span className="ml-1 text-[10px] text-blue-500">(Setback)</span>
                                             }
                                         </div>
                                         <div className="text-xl font-bold">{formatNum(f_NA, 3)}</div>
                                     </div>
                                     <div className="text-right bg-white px-2 py-1 rounded border border-slate-100 shadow-sm">
-                                        <div className="text-[10px] text-slate-400 mb-0.5">적응 제어 (<InlineMath math="f_{adapt}" />)</div>
+                                        <div className="text-[10px] text-slate-400 mb-0.5">적응 제어 (<Latex formula="f_{adapt}" />)</div>
                                         <div className="text-sm font-semibold text-slate-700">{currentMonthData.f_adapt}</div>
                                     </div>
                                 </div>
                                 <div className="text-xs text-slate-400">
                                     {zone?.heatingReducedMode === "shutdown" ? (
-                                        <InlineMath math="f_{NA} = 0.26 \cdot \frac{t_{NA}}{24} \cdot \exp(-\frac{\tau}{250}) \cdot f_{adapt}" />
+                                        <Latex formula="f_{NA} = 0.26 \cdot \frac{t_{NA}}{24} \cdot \exp(-\frac{\tau}{250}) \cdot f_{adapt}" />
+                                    ) : zone?.heatingReducedMode === "continuous" ? (
+                                        <Latex formula="f_{NA} = 0 \quad \text{(연속 난방)}" />
                                     ) : (
-                                        <InlineMath math="f_{NA} = 0.13 \cdot \frac{t_{NA}}{24} \cdot \exp(-\frac{\tau}{250}) \cdot f_{adapt}" />
+                                        <Latex formula="f_{NA} = 0.13 \cdot \frac{t_{NA}}{24} \cdot \exp(-\frac{\tau}{250}) \cdot f_{adapt}" />
                                     )}
                                 </div>
                             </div>
@@ -121,10 +133,12 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <div className="text-xs text-slate-500 font-medium mb-1">
-                                            주말 감경 계수 (<InlineMath math="f_{we}" />)
+                                            주말 감경 계수 (<Latex formula="f_{we}" />)
                                             {zone?.heatingReducedMode === "shutdown"
                                                 ? <span className="ml-1 text-[10px] text-red-500">(Shutdown)</span>
-                                                : <span className="ml-1 text-[10px] text-blue-500">(Setback)</span>
+                                                : zone?.heatingReducedMode === "continuous"
+                                                    ? <span className="ml-1 text-[10px] text-green-500">(Continuous)</span>
+                                                    : <span className="ml-1 text-[10px] text-blue-500">(Setback)</span>
                                             }
                                         </div>
                                         <div className="text-xl font-bold">{formatNum(f_we, 3)}</div>
@@ -134,9 +148,11 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                 </div>
                                 <div className="text-xs text-slate-400">
                                     {zone?.heatingReducedMode === "shutdown" ? (
-                                        <InlineMath math="f_{we} = 0.3 \cdot (1 - 0.2 \cdot \frac{\tau}{250})" />
+                                        <Latex formula="f_{we} = 0.3 \cdot (1 - 0.2 \cdot \frac{\tau}{250})" />
+                                    ) : zone?.heatingReducedMode === "continuous" ? (
+                                        <Latex formula="f_{we} = 0 \quad \text{(연속 난방)}" />
                                     ) : (
-                                        <InlineMath math="f_{we} = 0.2 \cdot (1 - 0.4 \cdot \frac{\tau}{250})" />
+                                        <Latex formula="f_{we} = 0.2 \cdot (1 - 0.4 \cdot \frac{\tau}{250})" />
                                     )}
                                 </div>
                             </div>
@@ -155,15 +171,15 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
 
                                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                                     <div className="space-y-1">
-                                        <div className="text-muted-foreground text-xs">기본 설정 (<InlineMath math="\theta_{int,H}" />)</div>
+                                        <div className="text-muted-foreground text-xs">기본 설정 (<Latex formula="\theta_{int,H}" />)</div>
                                         <div className="font-medium">{formatNum(Theta_int_set, 1)} °C</div>
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="text-muted-foreground text-xs">야간 감경 계수 (<InlineMath math="f_{NA}" />)</div>
+                                        <div className="text-muted-foreground text-xs">야간 감경 계수 (<Latex formula="f_{NA}" />)</div>
                                         <div className="font-medium">{formatNum(f_NA, 3)}</div>
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="text-muted-foreground text-xs">제어 보정 (<InlineMath math="\Delta \theta_{EMS}" />)</div>
+                                        <div className="text-muted-foreground text-xs">제어 보정 (<Latex formula="\Delta \theta_{EMS}" />)</div>
                                         <div className="font-medium">{formatNum(delta_theta_EMS, 2)} K</div>
                                     </div>
                                 </div>
@@ -171,14 +187,14 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                 <div className="mt-auto pt-4 border-t">
                                     <div className="flex items-center justify-between">
                                         <div className="text-xs text-muted-foreground">
-                                            <InlineMath math="\theta_{i,h,op}" />
+                                            <Latex formula="\theta_{i,h,op}" />
                                         </div>
                                         <div className="text-2xl font-bold text-red-600">
                                             {formatNum(currentMonthData.Theta_i_h_op || Theta_i_real, 2)} <span className="text-sm text-muted-foreground font-normal">°C</span>
                                         </div>
                                     </div>
                                     <div className="text-xs text-slate-500 text-right mt-1">
-                                        <InlineMath math="\theta_{i,h,op} = \max \left( (\theta_{int,H} + \Delta \theta_{EMS}) - f_{NA}(\theta_{int,H} - \theta_e), \quad \theta_{int,H} - \Delta \theta_{red} \frac{t_{red}}{24} \right)" />
+                                        <Latex formula="\theta_{i,h,op} = \max \left( (\theta_{int,H} + \Delta \theta_{EMS}) - f_{NA}(\theta_{int,H} - \theta_e), \quad \theta_{int,H} - \Delta \theta_{red} \frac{t_{red}}{24} \right)" />
                                     </div>
                                 </div>
                             </div>
@@ -192,11 +208,11 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
 
                                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                                     <div className="space-y-1">
-                                        <div className="text-muted-foreground text-xs">기본 설정 (<InlineMath math="\theta_{int,H}" />)</div>
+                                        <div className="text-muted-foreground text-xs">기본 설정 (<Latex formula="\theta_{int,H}" />)</div>
                                         <div className="font-medium">{formatNum(Theta_int_set, 1)} °C</div>
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="text-muted-foreground text-xs">주말 감경 계수 (<InlineMath math="f_{we}" />)</div>
+                                        <div className="text-muted-foreground text-xs">주말 감경 계수 (<Latex formula="f_{we}" />)</div>
                                         <div className="font-medium">{formatNum(f_we, 3)}</div>
                                     </div>
                                 </div>
@@ -204,7 +220,7 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                 <div className="mt-auto pt-4 border-t">
                                     <div className="flex items-center justify-between">
                                         <div className="text-xs text-muted-foreground">
-                                            <InlineMath math="\theta_{i,h,non-op}" />
+                                            <Latex formula="\theta_{i,h,non-op}" />
                                         </div>
                                         <div className="text-2xl font-bold text-red-600">
                                             {currentMonthData.avg_Ti_non_op
@@ -214,7 +230,7 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                         </div>
                                     </div>
                                     <div className="text-xs text-slate-500 text-right mt-1">
-                                        <InlineMath math="\theta_{i,h,we} = \max \left( \theta_{int,H} - f_{we}(\theta_{int,H} - \theta_e), \quad \theta_{int,H} - \Delta \theta_{red} \right)" />
+                                        <Latex formula="\theta_{i,h,we} = \max \left( \theta_{int,H} - f_{we}(\theta_{int,H} - \theta_e), \quad \theta_{int,H} - \Delta \theta_{red} \right)" />
                                     </div>
                                 </div>
                             </div>
@@ -225,10 +241,10 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                     <div className="space-y-1">
                                         <h4 className="font-semibold text-red-900">난방 유효 실내 온도 (Weighted Average)</h4>
                                         <div className="text-xs text-red-700 flex flex-col gap-0.5">
-                                            <span>기간 가중 평균: <InlineMath math="\theta_{i,h}" /></span>
+                                            <span>기간 가중 평균: <Latex formula="\theta_{i,h}" /></span>
                                             <span className="text-red-600/80">
-                                                (사용일수 <InlineMath math="d_{op}" />: {formatNum(currentMonthData.d_nutz || 0, 1)}일,
-                                                비사용일수 <InlineMath math="d_{we}" />: {formatNum(currentMonthData.d_we || 0, 1)}일)
+                                                (사용일수 <Latex formula="d_{op}" />: {formatNum(currentMonthData.d_nutz || 0, 1)}일,
+                                                비사용일수 <Latex formula="d_{we}" />: {formatNum(currentMonthData.d_we || 0, 1)}일)
                                             </span>
                                         </div>
                                     </div>
@@ -238,7 +254,7 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                 </div>
 
                                 <div className="pt-2 border-t border-red-200 w-full text-center text-sm text-red-600/80">
-                                    <InlineMath math="\theta_{i,h} = \frac{\theta_{i,h,op} \cdot d_{op} + \theta_{i,h,we} \cdot d_{we}}{d_{op} + d_{we}}" />
+                                    <Latex formula="\theta_{i,h} = \frac{\theta_{i,h,op} \cdot d_{op} + \theta_{i,h,we} \cdot d_{we}}{d_{op} + d_{we}}" />
                                 </div>
                             </div>
                         </div>
@@ -250,7 +266,7 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                                     <h4 className="font-semibold text-cyan-900">냉방 유효 실내 온도 (Cooling Effective Temp)</h4>
                                     <div className="text-xs text-cyan-700 flex flex-col gap-0.5">
                                         <span>
-                                            냉방 설정 온도 (<InlineMath math="\theta_{int,C}" />): <strong>{formatNum(currentMonthData.Theta_int_C, 1)}°C</strong>
+                                            냉방 설정 온도 (<Latex formula="\theta_{int,C}" />): <strong>{formatNum(currentMonthData.Theta_int_C, 1)}°C</strong>
                                         </span>
                                         <span className="text-cyan-600/80">단순 감경 적용: -2.0 K</span>
                                     </div>
@@ -261,7 +277,7 @@ export function EffectiveTemperatureVerification({ data, title, zone, selectedMo
                             </div>
 
                             <div className="pt-2 border-t border-cyan-200 w-full text-center text-sm text-cyan-600/80">
-                                <InlineMath math="\theta_{i,c} = \theta_{int,C} - 2.0" />
+                                <Latex formula="\theta_{i,c} = \theta_{int,C} - 2.0" />
                             </div>
                         </div>
                     </VerificationSection>

@@ -1,5 +1,5 @@
 import React from "react";
-import { InlineMath } from "react-katex";
+import { Latex } from "@/components/ui/latex";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -27,10 +27,10 @@ export function MathTooltip({
         </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs p-2 text-[11px]">
-        {title && <p className="font-bold mb-1">{title} (<InlineMath math={math} />)</p>}
-        {!title && <InlineMath math={math} />}
+        {title && <p className="font-bold mb-1">{title} (<Latex formula={math} />)</p>}
+        {!title && <Latex formula={math} />}
         <div className="mt-1 text-slate-400">
-          <InlineMath math={math} />
+          <Latex formula={math} />
         </div>
       </TooltipContent>
     </Tooltip>
@@ -42,7 +42,7 @@ export function MathTooltip({
  */
 interface VerificationSectionProps {
   step?: string;
-  title: string;
+  title: React.ReactNode;
   description?: string;
   children: React.ReactNode;
   className?: string;
@@ -85,7 +85,11 @@ export function VerificationSection({
               {step}
             </span>
           )}
-          {title.startsWith("\\") || title.includes("\\") ? <InlineMath math={title} /> : title}
+          {typeof title === "string" && (title.startsWith("\\") || (title.includes("\\") && !title.includes(" "))) ? (
+            <Latex formula={title} />
+          ) : (
+            title
+          )}
         </h3>
         <div className="flex items-center gap-4">
           {rightElement}

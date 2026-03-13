@@ -117,7 +117,7 @@ export default function VerifyBalancePage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">열손실/열취득 상세 균형 (Heat Balance)</h1>
                     <p className="text-muted-foreground mt-1">
-                        ISO 13790 / DIN 18599 기반의 에너지 밸런스 성분별 정밀 분석 페이지입니다.
+                        DIN/TS 18599:2025-10 기반의 에너지 밸런스 성분별 정밀 분석 페이지입니다.
                     </p>
                 </div>
                 <Button onClick={runScenario} disabled={loading} className="gap-2">

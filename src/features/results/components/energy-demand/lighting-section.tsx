@@ -3,7 +3,7 @@
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Zap } from "lucide-react";
-import { InlineMath } from "react-katex";
+import { Latex } from "@/components/ui/latex";
 import { formatNum } from "../../utils/formatters";
 import { VerificationSection, MathTooltip } from "../shared/verification-ui";
 
@@ -41,7 +41,7 @@ export function LightingSection({
                 <MathTooltip math="A" title="조명 부하 산정의 기준이 되는 존의 유효 가동 바닥 면적 (Nettofläche)" className="text-yellow-900 font-semibold">면적 (m²)</MathTooltip>
               </TableHead>
               <TableHead className="text-right">
-                <MathTooltip math="E_m" title="DIN 18599-10/Profiles에 따른 요구 유지조도 레벨" className="text-yellow-900 font-semibold">조도 (lx)</MathTooltip>
+                <MathTooltip math="E_m" title="DIN/TS 18599-10:2025-10/Profiles에 따른 요구 유지조도 레벨" className="text-yellow-900 font-semibold">조도 (lx)</MathTooltip>
               </TableHead>
               <TableHead className="text-right">
                 <MathTooltip math="P_{inst}" title="설치 조명 설비의 전력량 밀도 ($100 \\text{lx}$ 당 $W/m^2$ 기반 산출)" className="text-yellow-900 font-semibold">밀도 (W/m²)</MathTooltip>
@@ -49,8 +49,8 @@ export function LightingSection({
               <TableHead className="text-right">
                 <MathTooltip math="t_{occ}" title="해당 존의 일간 조명 가동(재실) 시간" className="text-yellow-900 font-semibold">시간 (h/d)</MathTooltip>
               </TableHead>
-              <TableHead className="text-right font-bold">요구량 (<InlineMath math="Q_{l,b}" />) (kWh)</TableHead>
-              <TableHead className="text-right font-bold text-orange-600">열획득 (<InlineMath math="Q_{I,l}" />) (kWh)</TableHead>
+              <TableHead className="text-right font-bold">요구량 (<Latex formula="Q_{l,b}" />) (kWh)</TableHead>
+              <TableHead className="text-right font-bold text-orange-600">열획득 (<Latex formula="Q_{I,l}" />) (kWh)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -85,9 +85,9 @@ export function LightingSection({
         </Table>
         <div className="bg-slate-50/80 px-4 py-3 border-t border-yellow-100 text-center">
           <div className="text-[12px] text-yellow-800 font-serif flex items-center justify-center gap-4">
-            <InlineMath math="Q_{l,b} = P_{inst} \cdot A \cdot t_{occ} \cdot d_{mth} \cdot 10^{-3}" />
+            <Latex formula="Q_{l,b} = P_{inst} \cdot A \cdot t_{occ} \cdot d_{mth} \cdot 10^{-3}" />
             <div className="w-px h-3 bg-slate-300" />
-            <InlineMath math="Q_{I,l} = Q_{l,b} \cdot 1.0" />
+            <Latex formula="Q_{I,l} = Q_{l,b} \cdot 1.0" />
           </div>
           <div className="text-[10px] text-slate-400 italic mt-1.5 leading-relaxed">
             조명 에너지 요구량 및 실내 열획득 산정 (100% Heat Gain Factor 적용)

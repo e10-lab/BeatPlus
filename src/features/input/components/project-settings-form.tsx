@@ -1,4 +1,10 @@
 import { useState } from "react";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -38,7 +44,7 @@ import {
     FileSignature,
     Calendar,
     FileCheck,
-    CloudSun
+    CloudSun,
 } from "lucide-react";
 
 async function getCoordinates(address: string): Promise<{ lat: number; lng: number } | null> {
@@ -216,8 +222,6 @@ export function ProjectSettingsForm({ project, onUpdate }: ProjectSettingsFormPr
                 mainPurpose: values.mainPurpose,
                 mainStructure: values.mainStructure,
                 scale: values.scale,
-                permitDate: values.permitDate,
-                constructionStartDate: values.constructionStartDate,
                 usageApprovalDate: values.usageApprovalDate,
                 weatherStationId: project.weatherStationId ?? undefined, // Preserve the calculated ID or undefined if none
             });

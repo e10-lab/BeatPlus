@@ -5,7 +5,7 @@ import { Surface } from "@/types/project";
 import { getSurfaces, deleteSurface, reorderSurfaces } from "@/services/surface-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit2, Trash2, Layers } from "lucide-react";
+import { Trash2, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Construction } from "@/types/project";
 import { SurfaceIcon } from "@/components/ui/icons/surface-icon";
@@ -101,9 +101,12 @@ function SortableSurfaceItem({ surface, index, constructions, onEdit, onDelete }
         >
             {/* 1. Type & Construction */}
             <div className="flex flex-col gap-1 min-w-0 pr-2">
-                <div className="font-semibold text-sm truncate flex items-center gap-2">
+                <div className="font-semibold text-sm truncate flex items-center gap-2 text-foreground">
                     <SurfaceIcon type={surface.type} />
-                    {getTypeLabel(surface.type)}
+                    <span>{surface.name || getTypeLabel(surface.type)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{getTypeLabel(surface.type)}</span>
                     {constructionName && (
                         <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">
                             {constructionName}
@@ -149,9 +152,6 @@ function SortableSurfaceItem({ surface, index, constructions, onEdit, onDelete }
 
             {/* 5. Actions */}
             <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); onEdit(surface); }}>
-                    <Edit2 className="h-4 w-4" />
-                </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); surface.id && onDelete(surface.id); }}>
                     <Trash2 className="h-4 w-4" />
                 </Button>

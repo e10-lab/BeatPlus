@@ -21,6 +21,7 @@ import { BarChart3, Clock, Database, Search, Thermometer as ThermometerIcon, Zap
 
 // 분석 탭 컴포넌트 추가
 import { VerificationTable } from "./verification-table";
+import { formatNum } from "../utils/formatters";
 
 
 interface ResultsViewProps {
@@ -148,7 +149,7 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                 <div>
                     <h2 className="text-lg font-semibold tracking-tight">에너지 해석 결과 (Monthly)</h2>
                     <p className="text-sm text-muted-foreground">
-                        DIN V 18599 월간 정적 계산 (Monthly Balance Method)
+                        DIN/TS 18599:2025-10 월간 정적 계산 (Monthly Balance Method)
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -180,10 +181,10 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">
-                                {yearlyData.primaryEnergy.total.toFixed(0)} <span className="text-lg font-normal text-slate-400">kWh/a</span>
+                                {formatNum(yearlyData.primaryEnergy.total, 0)} <span className="text-lg font-normal text-slate-400">kWh/a</span>
                             </div>
                             <div className="text-sm text-slate-400 mt-1">
-                                {(yearlyData.primaryEnergy.total / area).toFixed(1)} kWh/m²a
+                                {formatNum(yearlyData.primaryEnergy.total / area, 1)} kWh/m²a
                             </div>
                         </CardContent>
                     </Card>
@@ -195,10 +196,10 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">
-                                {yearlyData.co2Emissions?.toFixed(0) ?? 0} <span className="text-lg font-normal text-emerald-400">kg/a</span>
+                                {formatNum(yearlyData.co2Emissions ?? 0, 0)} <span className="text-lg font-normal text-emerald-400">kg/a</span>
                             </div>
                             <div className="text-sm text-emerald-400 mt-1">
-                                {(yearlyData.co2Emissions || 0 / area).toFixed(1)} kg/m²a
+                                {formatNum((yearlyData.co2Emissions || 0) / area, 1)} kg/m²a
                             </div>
                         </CardContent>
                     </Card>
@@ -210,10 +211,10 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">
-                                {yearlyData.pvGeneration.toFixed(0)} <span className="text-lg font-normal text-amber-400">kWh/a</span>
+                                {formatNum(yearlyData.pvGeneration, 0)} <span className="text-lg font-normal text-amber-400">kWh/a</span>
                             </div>
                             <div className="text-sm text-amber-400 mt-1">
-                                자가소비 {(yearlyData.selfConsumption / (yearlyData.pvGeneration || 1) * 100).toFixed(0)}%
+                                자가소비 {formatNum(yearlyData.selfConsumption / (yearlyData.pvGeneration || 1) * 100, 0)}%
                             </div>
                         </CardContent>
                     </Card>
@@ -238,7 +239,7 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                             </CardHeader>
                             <CardContent className="p-3 pt-1">
                                 <div className="text-lg font-bold">
-                                    {((yearlyData.finalEnergy.heating + yearlyData.finalEnergy.cooling + yearlyData.finalEnergy.dhw + yearlyData.finalEnergy.lighting + yearlyData.finalEnergy.auxiliary) / 1000).toFixed(1)} <span className="text-xs font-normal text-muted-foreground">MWh</span>
+                                    {formatNum((yearlyData.finalEnergy.heating + yearlyData.finalEnergy.cooling + yearlyData.finalEnergy.dhw + yearlyData.finalEnergy.lighting + yearlyData.finalEnergy.auxiliary) / 1000, 1)} <span className="text-xs font-normal text-muted-foreground">MWh</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -340,22 +341,22 @@ export function ResultsView({ projectId, isActive = true }: ResultsViewProps) {
                                                 <tr key={m.month} className="border-b hover:bg-muted/10 transition-colors">
                                                     <td className="px-4 py-2 font-medium">{m.month}월</td>
                                                     <td className="px-4 py-2 text-muted-foreground">
-                                                        {weatherData?.monthly.find(w => w.month === m.month)?.Te.toFixed(1) ?? "-"}
+                                                        {formatNum(weatherData?.monthly.find(w => w.month === m.month)?.Te, 1)}
                                                     </td>
-                                                    <td className="px-4 py-2">{m.avg_Ti_op?.toFixed(1) ?? m.avg_Ti.toFixed(1)}</td>
-                                                    <td className="px-4 py-2 text-muted-foreground">{m.avg_Ti_non_op?.toFixed(1) ?? "-"}</td>
+                                                    <td className="px-4 py-2">{formatNum(m.avg_Ti_op ?? m.avg_Ti, 1)}</td>
+                                                    <td className="px-4 py-2 text-muted-foreground">{formatNum(m.avg_Ti_non_op, 1)}</td>
                                                     <td className={`px-4 py-2 ${m.QT > 0 ? "text-red-600 font-medium" : m.QT < 0 ? "text-blue-600 font-medium" : "text-gray-600"}`}>
-                                                        {(Math.abs(m.QT) / area).toFixed(1)}
+                                                        {formatNum(Math.abs(m.QT) / area, 1)}
                                                     </td>
                                                     <td className={`px-4 py-2 ${m.QV > 0 ? "text-red-600 font-medium" : m.QV < 0 ? "text-blue-600 font-medium" : "text-gray-600"}`}>
-                                                        {(Math.abs(m.QV) / area).toFixed(1)}
+                                                        {formatNum(Math.abs(m.QV) / area, 1)}
                                                     </td>
-                                                    <td className="px-4 py-2 text-red-600 font-medium">{(Math.abs(m.QS) / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 text-red-600 font-medium">{(Math.abs(m.QI) / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 font-bold text-orange-600">{(m.Q_w_b / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 font-bold text-red-700">{(m.Q_h_b / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 font-bold text-blue-700">{(m.Q_c_b / area).toFixed(1)}</td>
-                                                    <td className="px-4 py-2 font-bold text-purple-700">{(m.Q_aux / area).toFixed(1)}</td>
+                                                    <td className="px-4 py-2 text-red-600 font-medium">{formatNum(Math.abs(m.QS) / area, 1)}</td>
+                                                    <td className="px-4 py-2 text-red-600 font-medium">{formatNum(Math.abs(m.QI) / area, 1)}</td>
+                                                    <td className="px-4 py-2 font-bold text-orange-600">{formatNum(m.Q_w_b / area, 1)}</td>
+                                                    <td className="px-4 py-2 font-bold text-red-700">{formatNum(m.Q_h_b / area, 1)}</td>
+                                                    <td className="px-4 py-2 font-bold text-blue-700">{formatNum(m.Q_c_b / area, 1)}</td>
+                                                    <td className="px-4 py-2 font-bold text-purple-700">{formatNum(m.Q_aux / area, 1)}</td>
                                                 </tr>
                                             );
                                         })}
@@ -386,11 +387,11 @@ function SummaryCard({ title, value, unit, subValue, subUnit }: { title: string,
             </CardHeader>
             <CardContent className="p-4 pt-0">
                 <div className="text-xl font-bold">
-                    {value.toFixed(0)} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+                    {formatNum(value, 0)} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
                 </div>
                 {subValue !== undefined && (
                     <div className="text-xs text-muted-foreground mt-1">
-                        {subValue.toFixed(1)} {subUnit}
+                        {formatNum(subValue, 1)} {subUnit}
                     </div>
                 )}
             </CardContent>

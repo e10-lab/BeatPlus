@@ -65,7 +65,7 @@ export function ClimateView({ project }: ClimateViewProps) {
             <div className="flex justify-between items-center bg-muted/20 p-4 rounded-lg mb-6">
                 <div>
                     <h2 className="text-lg font-semibold tracking-tight">기후 분석 (Climate Analysis)</h2>
-                    <p className="text-sm text-muted-foreground">표준 기상 데이터(EPW) 상세 분석 및 시각화</p>
+                    <p className="text-sm text-muted-foreground">표준 기상 데이터 (TMYx 2009-2023) 상세 분석 및 시각화</p>
                 </div>
             </div>
             <ClimateAnalysisView weatherData={weatherData} />

@@ -1,6 +1,6 @@
 
 export interface UsageProfile {
-    id: string; // DIN 18599-10 프로필 ID 또는 식별 키
+    id: string; // DIN/TS 18599-10:2025-10 프로파일 ID 또는 식별 키
     name: string; // 한국어 명칭 (원본 DIN 번호 포함)
     version?: "2011" | "2018" | "2025"; // DIN/TS 18599 버전 구분
 
@@ -39,13 +39,13 @@ export interface UsageProfile {
     // 6. 내부 발열
     metabolicHeat: number; // Wh/(m²·d) (인체 발열)
     equipmentHeat: number; // Wh/(m²·d) (기기 발열)
-    dhwDemand: number; // Wh/(m²·d) (급탕 부하) - DIN 18599-10 Table 4 & 5
+    dhwDemand: number; // Wh/(m²·d) (급탕 부하) - DIN/TS 18599-10:2025-10 Table 4 & 5
 
     // 7. 기타 계수 (Table 8 etc)
     reductionFactorPollution?: number; // F_V (오염으로 인한 감소 계수)
     pollutionFactor?: number; // k_2 (오염 계수)
 
-    // 8. 건물 자동화 (Building Automation) - Table 9 (Non-Res) / Table 5 (Res)
+    // 8. 건물 자동화 (Building Automation) - DIN/TS 18599-11:2025-10 Table 9 (Non-Res) / Table 5 (Res)
     deltaThetaEMS?: { d: number; c: number; b: number; a: number }; // Δθ_EMS [K]
     fAdapt?: { d: number; c: number; b: number; a: number }; // f_adapt
 
@@ -79,8 +79,8 @@ export const DIN_18599_PROFILES: Record<string, UsageProfile> = {
     },
     // 2. Office (Open Plan) - was 2_open_plan (from DIN ~3 but normalized to 2 here? User wants 1-43)
     // Actually standard 2 is Group Office, 3 is Open Plan.
-    // Let's assume the user's "1-43" implies strictly following the DIN list. 
-    // DIN 18599-10 Table 4:
+    // Let's assume the user's "1-43" implies strictly following the DIN/TS 18599-10 list. 
+    // DIN/TS 18599-10:2025-10 Table 4:
     // 1: Single office
     // 2: Group office (often merged with 1 in simplified tools, but let's see current data)
     // Current data had "2_open_plan" as "02".

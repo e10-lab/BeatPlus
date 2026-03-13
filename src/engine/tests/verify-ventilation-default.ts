@@ -51,7 +51,7 @@ async function runTest() {
     // QV = H_ve * 15 * 744 / 1000 = H_ve * 11.16
 
     // H_ve = rho * cp * n * V.
-    // n_nutz for '1_office' (DIN 18599-10 2018/2025):
+    // n_nutz for '1_office' (DIN/TS 18599-10:2025-10):
     // minOutdoorAir = 4 m3/(h m2) * 100 m2 = 400 m3/h?
     // Wait, profile 1_office minOutdoorAir is 4.0? Let's check profile.
     // If n_mech = n_nutz = 400 m3/h approx.
