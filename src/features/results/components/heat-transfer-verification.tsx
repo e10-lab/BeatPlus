@@ -217,6 +217,22 @@ export function HeatTransferVerification({ data, zone }: HeatTransferVerificatio
                                         </div>
                                     </TableCell>
                                 </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-bold text-slate-500">냉방 (Non-Op)</TableCell>
+                                    <TableCell className="text-right border-l">{formatNum(getAvg(cData, 'f_e'), 2)}</TableCell>
+                                    <TableCell className="text-right font-bold text-amber-700">{formatNum(getAvg(cData, 'n_inf_non_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(cData, 'e_shield'), 3)}</TableCell>
+                                    <TableCell className="text-right border-l">{formatNum(getAvg(cData, 'n_win_min'), 2)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(cData, 'Delta_n_win'), 3)}</TableCell>
+                                    <TableCell className="text-right">{formatNum(getAvg(cData, 'Delta_n_win_mech'), 3)}</TableCell>
+                                    <TableCell className="text-right font-bold text-sky-700">{formatNum(getAvg(cData, 'n_win_non_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right border-l font-bold text-violet-700">{formatNum(getAvg(cData, 'n_mech_non_op_phys'), 3)}</TableCell>
+                                    <TableCell className="text-right font-bold text-slate-500 bg-slate-50/10">
+                                        <div className="flex flex-col items-end">
+                                            <span>{formatNum(getAvg(cData, 'H_ve_tau_c_non_op'), 1)}</span>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
                             </TableBody>
                         </Table>
                     </div>
